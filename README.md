@@ -26,7 +26,7 @@ And then you can do (import, require, etc whatever the language you plan on usin
 - JS
 - easyjs
 
-* = default
+'*' = default
 
 ## Used in
 - Pixel Ai Dash

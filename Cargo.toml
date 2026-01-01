@@ -4,3 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+mlua = { version = "0.11", features = ["lua54"], optional = true }
+anyhow = "1.0.100"
+
+[features]
+# Default include LUA only.
+default = ["lua"]
+# Include LUA scripting.
+lua = ["dep:mlua"]
