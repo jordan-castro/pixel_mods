@@ -1,10 +1,7 @@
 # TODO
 
-- add_module
 - add_class
 
-- module_add_variable
-- module_add_callback
 - module_add_class
 - module_add_module
 
