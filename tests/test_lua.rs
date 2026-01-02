@@ -2,7 +2,7 @@
 mod tests {
     use std::{ffi::c_void, ptr};
 
-    use pixel_mods::{shared::{PtrMagic, var::Var}, *};
+    use pixel_script::{shared::{PtrMagic, var::Var}, *};
 
     // Testing callbacks
     pub extern "C" fn print_wrapper(

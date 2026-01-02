@@ -47,10 +47,16 @@ macro_rules! create_raw_string {
     }};
 }
 
+/// Current pixelscript version.
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_version() -> u32 {
+    0x00010000 // 1.0.0
+}
+
 /// Add a variable to the __main__ context.
 /// Gotta pass in a name, and a Variable value.
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelmods_add_variable(name: *const c_char, variable: Var) {
+pub extern "C" fn pixelscript_add_variable(name: *const c_char, variable: Var) {
     // Get string as rust.
     let r_str = convert_borrowed_string!(name);
     if r_str.is_empty() {
@@ -64,7 +70,7 @@ pub extern "C" fn pixelmods_add_variable(name: *const c_char, variable: Var) {
 /// Add a callback to the __main__ context.
 /// Gotta pass in a name, Func, and a optionl *void opaque data type
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelmods_add_callback(name: *const c_char, func: Func, opaque: *mut c_void) {
+pub extern "C" fn pixelscript_add_callback(name: *const c_char, func: Func, opaque: *mut c_void) {
     // Get rust name
     let name_str = convert_borrowed_string!(name);
     if name_str.is_empty() {
@@ -78,9 +84,9 @@ pub extern "C" fn pixelmods_add_callback(name: *const c_char, func: Func, opaque
 /// Execute some lua code. Will return a String, an empty string means that the 
 /// code executed succesffuly
 /// 
-/// The result needs to be freed by calling `pixelmods_free_str` 
+/// The result needs to be freed by calling `pixelscript_free_str` 
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelmods_exec_lua(code: *const c_char, file_name: *const c_char) -> *const c_char {
+pub extern "C" fn pixelscript_exec_lua(code: *const c_char, file_name: *const c_char) -> *const c_char {
     // First convert code and file_name to rust strs
     let code_str = convert_borrowed_string!(code);
     if code_str.is_empty() {
@@ -97,9 +103,9 @@ pub extern "C" fn pixelmods_exec_lua(code: *const c_char, file_name: *const c_ch
     create_raw_string!(result)
 }
 
-/// Free the string created by the pixelmods library
+/// Free the string created by the pixelscript library
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelmods_free_str(string: *mut c_char) {
+pub extern "C" fn pixelscript_free_str(string: *mut c_char) {
     if !string.is_null() {
         unsafe {
             // Let the string go out of scope to be dropped
@@ -108,9 +114,9 @@ pub extern "C" fn pixelmods_free_str(string: *mut c_char) {
     }
 }
 
-/// Create a new pixelmods Module.
+/// Create a new pixelscript Module.
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelmods_new_module(name: *const c_char) -> *mut Module {
+pub extern "C" fn pixelscript_new_module(name: *const c_char) -> *mut Module {
     if name.is_null() {
         return ptr::null_mut();
     }
@@ -123,7 +129,7 @@ pub extern "C" fn pixelmods_new_module(name: *const c_char) -> *mut Module {
 /// 
 /// Pass in the modules pointer and callback paramaters.
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelmods_module_add_callback(module_ptr: *mut Module, name: *const c_char, func: Func, opaque: *mut c_void) {
+pub extern "C" fn pixelscript_module_add_callback(module_ptr: *mut Module, name: *const c_char, func: Func, opaque: *mut c_void) {
     if module_ptr.is_null() {
         return;
     }
@@ -144,7 +150,7 @@ pub extern "C" fn pixelmods_module_add_callback(module_ptr: *mut Module, name: *
 /// 
 /// Pass in the module pointer and variable params.
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelmods_module_add_variable(module_ptr: *mut Module, name: *const c_char, variable: Var) {
+pub extern "C" fn pixelscript_module_add_variable(module_ptr: *mut Module, name: *const c_char, variable: Var) {
     if module_ptr.is_null() {
         return;
     }
@@ -164,7 +170,7 @@ pub extern "C" fn pixelmods_module_add_variable(module_ptr: *mut Module, name: *
 /// 
 /// After this you can forget about the ptr since PM handles it.
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelmods_add_module(module_ptr: *mut Module) {
+pub extern "C" fn pixelscript_add_module(module_ptr: *mut Module) {
     if module_ptr.is_null() {
         return;
     }

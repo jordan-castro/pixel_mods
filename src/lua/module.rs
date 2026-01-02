@@ -7,7 +7,7 @@ use crate::{
 use mlua::prelude::*;
 
 /// Add a module to Lua!
-pub fn add_module(module: Module) {
+pub fn add_module(module: &Module) {
     // First get lua state
     let state = get_state();
 

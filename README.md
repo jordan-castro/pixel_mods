@@ -1,5 +1,5 @@
-# Pixel Mods
-Pixel Mods is a embeddable scripting library built in Rust.
+# Pixel Script
+Pixel Script is a multi language modding runtime built in Rust.
 
 ## Why
 Because I spent 3 weeks trying to figure out how to embed pocketpy v2.x in C++17. This way instead I just compile the 
