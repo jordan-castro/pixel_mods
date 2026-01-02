@@ -1,19 +1,17 @@
-use std::{any::Any, ffi::c_void};
+use std::ffi::c_void;
 
 use mlua::prelude::*;
 // use mlua::{Integer, IntoLua, Lua, MultiValue, Value::Nil, Variadic};
 
-use crate::{lua::get_state, shared::{self, func::{Func, get_function_lookup}, var::Var}};
+use crate::{lua::get_state, shared::{func::{Func, get_function_lookup}, var::Var}};
 
-/// Add a callback to lua __main__ context.
-pub fn add_callback(name: &str, func: Func, opaque: *mut c_void) {
-    let state = get_state();
-
+/// For internal use since modules also need to use the same logic for adding a Lua callback.
+pub(crate) fn internal_add_callback(lua: &Lua, func: Func, opaque: *mut c_void) -> LuaFunction {
     // Save the function
     let mut function_lookup = get_function_lookup();
     let idx = function_lookup.add_function(func, opaque);
 
-    let lua_func = state.engine.create_function(move |lua, args: LuaMultiValue| {
+    lua.create_function(move |lua, args: LuaMultiValue| {
         // Convert args -> argv for pixelmods
         let mut argv: Vec<Var> = vec![];
 
@@ -82,7 +80,12 @@ pub fn add_callback(name: &str, func: Func, opaque: *mut c_void) {
                 // Memory will drop here, and Var will be automatically freed!
             }
         }
-    }).expect("Could not create lua function");
+    }).expect("Could not create lua function")
+}
 
+/// Add a callback to lua __main__ context.
+pub fn add_callback(name: &str, func: Func, opaque: *mut c_void) {
+    let state = get_state();
+    let lua_func = internal_add_callback(&state.engine, func, opaque);
     state.engine.globals().set(name, lua_func).expect("Could not add callback to Lua.");
 }

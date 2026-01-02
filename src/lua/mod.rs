@@ -1,10 +1,9 @@
 pub mod var;
 pub mod func;
+pub mod module;
 
-use std::{collections::HashMap, sync::{Mutex, OnceLock}};
+use std::{sync::{Mutex, OnceLock}};
 use mlua::prelude::*;
-
-use crate::shared::func::Func;
 
 /// This is the Lua state. Each language gets it's own private state
 struct State {
@@ -26,13 +25,15 @@ fn get_state() -> std::sync::MutexGuard<'static, State> {
     // This will block the C thread if another thread is currently using Lua
     mutex.lock().expect("Failed to lock Lua State")
 }
+
 /// Execute some orbituary lua code.
 /// Returns a String. Empty means no error happened and was successful!
 pub fn execute(code: &str, file_name: &str) -> String {
     let state = get_state();
     let res = state.engine.load(code).exec();
     if res.is_err() {
-        return res.unwrap_err().to_string();
+        let error_str = format!("Error in LUA: {}, for file: {}", res.unwrap_err().to_string(), file_name);
+        return error_str;
     }
 
     String::from("")

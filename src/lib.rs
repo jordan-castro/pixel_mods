@@ -1,8 +1,10 @@
-use std::ffi::{CStr, CString, c_char, c_void};
+use std::{ffi::{CStr, CString, c_char, c_void}, ptr};
 use shared::{
     var::Var,
     func::Func
 };
+
+use crate::shared::{PtrMagic, module::Module};
 
 pub mod shared;
 pub mod lua;
@@ -17,6 +19,21 @@ macro_rules! convert_borrowed_string {
                 let c_str = CStr::from_ptr($cstr);
                 c_str.to_str().unwrap_or("")
             }
+        }
+    }};
+}
+
+/// Convert a owned C string (i.e. owned by us now.) into a Rust String.
+/// 
+/// The C memory will be freed automatically, and you get a nice clean String!
+macro_rules! convert_owned_string {
+    ($cstr:expr) => {{
+        if $cstr.is_null() {
+            String::new()
+        } else {
+            let owned_string = unsafe { CString::from_raw($cstr) };
+
+            owned_string.into_string().unwrap_or_else(|_| String::from("Invalid UTF-8"))  
         }
     }};
 }
@@ -89,4 +106,62 @@ pub extern "C" fn pixelmods_free_str(string: *mut c_char) {
             let _ = CString::from_raw(string);
         }
     }
+}
+
+/// Create a new pixelmods Module.
+/// 
+/// Just pass in a name, PM will handle it's memory from here on out.
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelmods_new_module(name: *mut c_char) -> *mut Module {
+    if name.is_null() {
+        return ptr::null_mut();
+    }
+    let name_string = convert_owned_string!(name);
+
+    Module::new(name_string).into_raw()
+}
+
+/// Add a callback to a module.
+/// 
+/// Pass in the modules pointer and callback paramaters.
+/// 
+/// PM will handle the string memory from here on out.
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelmods_module_add_callback(module_ptr: *mut Module, name: *mut c_char, func: Func, opaque: *mut c_void) {
+    if module_ptr.is_null() {
+        return;
+    }
+
+    if name.is_null() {
+        return;
+    }
+
+    // Get actual data
+    let module = unsafe {Module::from_borrow(module_ptr)};
+    let name_owned = convert_owned_string!(name);
+
+    // Now add callback
+    module.add_callback(name_owned.as_str(), func, opaque);
+}
+
+/// Add a Varible to a module.
+/// 
+/// Pass in the module pointer and variable params.
+/// 
+/// PM will handle the string memory from here on out.
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelmods_module_add_variable(module_ptr: *mut Module, name: *mut c_char, variable: Var) {
+    if module_ptr.is_null() {
+        return;
+    }
+
+    if name.is_null() {
+        return;
+    }
+
+    let module = unsafe {Module::from_borrow(module_ptr)};
+    let name_owned = convert_owned_string!(name);
+
+    // Now add variable
+    module.add_variable(&name_owned, variable);
 }

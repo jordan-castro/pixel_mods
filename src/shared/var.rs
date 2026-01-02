@@ -5,6 +5,8 @@ use std::{
 
 use anyhow::{Error, anyhow};
 
+use crate::shared::PtrMagic;
+
 /// Macro for writing out the Var:: get methods.
 macro_rules! write_func {
     ($ (($func_name:ident, $field_name:ident, $ret_type:ty, $tag_variant:path) ),* $(,)?) => {
@@ -63,7 +65,7 @@ macro_rules! implement_from_var {
 
 /// This represents the variable type that is being read or created.
 #[repr(u32)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum VarType {
     Int32,
     Int64,
@@ -101,7 +103,9 @@ pub union VarValue {
 /// The Variable struct that can be accessed directly from C.
 #[repr(C)]
 pub struct Var {
+    /// A tag for the variable type.
     pub tag: VarType,
+    /// A value as a union.
     pub value: VarValue,
 }
 
@@ -259,4 +263,29 @@ implement_from_var! {
     f32, get_f32;
     f64, get_f64;
     bool, get_bool
+}
+
+impl PtrMagic for Var {}
+
+impl Clone for Var {
+    fn clone(&self) -> Self {
+        unsafe {
+            match self.tag {
+                VarType::Int32 => Var::new_i32(self.value.i32_val),
+                VarType::Int64 => Var::new_i64(self.value.i64_val),
+                VarType::UInt32 => Var::new_u32(self.value.u32_val),
+                VarType::UInt64 => Var::new_u64(self.value.u64_val),
+                VarType::String => Var {
+                    tag: VarType::String,
+                    value: VarValue {
+                        string_val: self.value.string_val,
+                    },
+                },
+                VarType::Bool => Var::new_bool(self.value.bool_val),
+                VarType::Float32 => Var::new_f32(self.value.f32_val),
+                VarType::Float64 => Var::new_f64(self.value.f64_val),
+                VarType::Null => Var::new_null(),
+            }
+        }
+    }
 }
