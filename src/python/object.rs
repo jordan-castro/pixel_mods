@@ -37,7 +37,7 @@ pub(super) fn create_object(vm: VirtualMachine, module_name: Option<&str>, obj_n
     // Class type does not yet exist, so create it.
     let class_type = vm.ctx.new_class(module_name, obj_name, vm.ctx.types.object_type.to_owned(), slots);
     // let object = vm.ctx.new_class(module, name, base, slots)
-    
+
     // Add methods to class
     for method in source.callbacks.iter() {
         // TODO: create_function() method
