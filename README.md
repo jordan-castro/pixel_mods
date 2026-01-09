@@ -1,6 +1,6 @@
 # Pixel Script
 
-A multi language modding runtime built in Rust.
+A multi language scripting runtime built in Rust.
 
 PixelScript lets you expose the same API to multiple different languages in your program. Because it compiles to a C library, you can use it anywhere. 
 
