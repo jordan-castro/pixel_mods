@@ -6,7 +6,7 @@ mod tests {
         sync::Arc,
     };
 
-    use pixel_script::{
+    use pixelscript::{
         lua::LuaScripting,
         shared::{PixelScript, PtrMagic, object::PixelObject, var::Var},
         *,
@@ -101,9 +101,10 @@ mod tests {
             let p_name = Var::from_borrow(args[1]);
             let p_name = p_name.get_string().unwrap();
             let p = Person::new(p_name.clone());
+            let type_name = create_raw_string!("Person");
 
             let ptr = Person::into_raw(p) as *mut c_void;
-            let pixel_object = pixelscript_new_object(ptr, free_person);
+            let pixel_object = pixelscript_new_object(ptr, free_person, type_name);
             let set_name_raw = create_raw_string!("set_name");
             let get_name_raw = create_raw_string!("get_name");
             pixelscript_object_add_callback(pixel_object, set_name_raw, set_name, opaque);
@@ -113,6 +114,7 @@ mod tests {
 
             free_raw_string!(set_name_raw);
             free_raw_string!(get_name_raw);
+            free_raw_string!(type_name);
             var
         }
     }

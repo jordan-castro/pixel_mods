@@ -409,16 +409,17 @@ pub extern "C" fn pixelscript_free_module(module_ptr: *mut Module) {
 pub extern "C" fn pixelscript_new_object(
     ptr: *mut c_void,
     free_method: FreeMethod,
+    type_name: *const c_char
 ) -> *mut PixelObject {
     assert_initiated!();
-    if ptr.is_null() {
+    if ptr.is_null() || type_name.is_null() {
         return ptr::null_mut();
     }
 
-    // Create a random hash for typename
-    let typename = random_string();
+    // Borrow type_name
+    let type_name = borrow_string!(type_name);
 
-    PixelObject::new(ptr, free_method, &typename).into_raw()
+    PixelObject::new(ptr, free_method, type_name).into_raw()
 }
 
 /// Add a callback to a object.

@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, sync::{Arc, OnceLock}};
 
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
-use rustpython::vm::{Interpreter, PyObjectRef, Settings, convert::ToPyObject, scope::Scope};
+use rustpython::vm::{Interpreter, PyObjectRef, PyRef, Settings, builtins::PyType, convert::ToPyObject, scope::Scope};
 
 use crate::{python::{func::create_function, module::create_module}, shared::PixelScript};
 
@@ -17,7 +17,9 @@ struct State {
     /// The global variable scope (for running in __main__)
     global_scope: PyObjectRef,
     /// Cached class types
-    class_types: RefCell<HashMap<String, PyObjectRef>>,
+    class_types: RefCell<HashMap<String, &'static PyRef<PyType>>>,
+    /// Cached class ptrs
+    class_ptrs: RefCell<Vec<*mut PyRef<PyType>>>,
     /// Cached leaked names.
     cached_leaks: RefCell<HashMap<String,  *mut str>>
 }
@@ -41,15 +43,23 @@ pub(self) unsafe fn pystr_leak(s:String) -> &'static str {
 }
 
 /// Get a class type from cache
-pub(self) fn get_class_type_from_cache(type_name: &str) -> Option<PyObjectRef> {
+pub(self) fn get_class_type_from_cache(type_name: &str) -> Option<&'static PyRef<PyType>> {
     let state = get_state();
     state.class_types.borrow().get(type_name).cloned()
 }
 
 /// Store a new class type in cache.
-pub(self) fn store_class_type_in_cache(type_name: &str, class_type: PyObjectRef) {
+pub(self) fn store_class_type_in_cache(type_name: &str, class_type: PyRef<PyType>) {
     let state = get_state();
-    state.class_types.borrow_mut().insert(type_name.to_string(), class_type);
+
+    // Leak class
+    let class_static: &'static PyRef<PyType> = unsafe {
+        let leaked_ptr = Box::into_raw(Box::new(class_type.clone()));
+        state.class_ptrs.borrow_mut().push(leaked_ptr);
+        // Cache ptr
+        &*leaked_ptr // Dereference to get the static ref
+    };
+    state.class_types.borrow_mut().insert(type_name.to_string(), class_static);
 }
 
 impl Drop for State {
@@ -63,6 +73,15 @@ impl Drop for State {
                 }
             }
         }
+
+        for ptr in self.class_ptrs.borrow().iter() {
+            if !ptr.is_null() {
+                unsafe {
+                    let _ = Box::from_raw(ptr.to_owned());
+                }
+            }
+        }
+        self.class_ptrs.borrow_mut().clear();
     }
 }
 unsafe impl Send for State {}
@@ -100,7 +119,8 @@ fn get_state() -> ReentrantMutexGuard<'static, State> {
                 engine: interp, 
                 global_scope: scope,
                 class_types: RefCell::new(HashMap::new()),
-                cached_leaks: RefCell::new(HashMap::new())
+                cached_leaks: RefCell::new(HashMap::new()),
+                class_ptrs: RefCell::new(vec![])
             }
         )
 
@@ -162,3 +182,50 @@ impl PixelScript for PythonScripting {
         })
     }
 }
+
+// TODO: this but for Python
+
+// impl ObjectMethods for LuaScripting {
+//     fn object_call(
+//         var: &crate::shared::var::Var,
+//         method: &str,
+//         args: Vec<crate::shared::var::Var>,
+//     ) -> Result<crate::shared::var::Var, anyhow::Error> {
+//         // Get the lua table.
+//         let table = unsafe {
+//             if var.is_host_object() {
+//                 // This is from the PTR!
+//                 let pixel_object = get_object(var.value.host_object_val).expect("No HostObject found.");
+//                 let lang_ptr = pixel_object.lang_ptr.lock().unwrap();
+//                 // Get as table.
+//                 let table_ptr = *lang_ptr as *const LuaTable;
+//                 // Return table
+//                 (&*table_ptr).clone()
+//             } else {
+//                 // Just grab it from the ptr itself
+//                 let table_ptr = var.value.object_val as *const LuaTable;
+//                 (&*table_ptr).clone()
+//             }
+//         };
+
+//         // Call method
+//         let mut lua_args = vec![];
+//         {
+//             // State start
+//             let state = get_lua_state();
+//             for arg in args {
+//                 lua_args.push(arg.into_lua(&state.engine).expect("Could not convert Var into Lua Var"));
+//             }
+//             // State drop
+//         }
+//         // The function could potentially call the state
+//         let res = table.call_function(method, lua_args).expect("Could not call function on Lua Table.");
+
+//         // State start again
+//         let state = get_lua_state();
+//         let pixel_res = Var::from_lua(res, &state.engine).expect("Could not convert LuaVar into PixelScript Var.");
+
+//         Ok(pixel_res)
+//         // Drop state
+//     }
+// }

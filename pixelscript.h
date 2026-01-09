@@ -307,7 +307,8 @@ void pixelscript_free_module(struct Module *module_ptr);
  * This must be wrapped in a `pixelscript_var_object` before use within a callback. If setting to a variable, this is done automatically for you.
  */
 struct PixelObject *pixelscript_new_object(void *ptr,
-                                           FreeMethod free_method);
+                                           FreeMethod free_method,
+                                           const char *type_name);
 
 /**
  * Add a callback to a object.

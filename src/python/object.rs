@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
-use rustpython::vm::{PyObjectRef, TryFromObject, VirtualMachine, convert::ToPyObject, function::FuncArgs, types::{PyTypeFlags, PyTypeSlots}};
+use rustpython::vm::{AsObject, Py, PyObjectRef, PyPayload, TryFromObject, VirtualMachine, builtins::PyType, convert::{IntoObject, ToPyObject}, function::{FuncArgs, PyMethodFlags}, types::{PyTypeFlags, PyTypeSlots}};
 
 use crate::{python::{get_class_type_from_cache, pystr_leak, store_class_type_in_cache}, shared::{PixelScriptRuntime, func::call_function, object::PixelObject, var::Var}};
 
 /// Create object callback methods
-fn create_object_method(vm: &VirtualMachine, fn_name: &str, fn_idx: i32) -> PyObjectRef {
+fn create_object_method(vm: &VirtualMachine, fn_name: &str, fn_idx: i32, static_class: &'static Py<PyType>) -> PyObjectRef {
     let static_name = unsafe { pystr_leak(fn_name.to_string()) };
 
-    vm.new_function(static_name, move |args: FuncArgs, vm: &VirtualMachine| {
+    vm.ctx.new_method_def(static_name, move |args: FuncArgs, vm: &VirtualMachine| {
         // First arg is a object
         let pyobj = args.args[0].clone();
         let obj_id = pyobj.get_attr("_id", vm).expect("Could not get _id from Python.");
@@ -31,7 +31,7 @@ fn create_object_method(vm: &VirtualMachine, fn_name: &str, fn_idx: i32) -> PyOb
             let res = call_function(fn_idx, argv);
             res.to_pyobject(vm)
         }
-    }).into()
+    }, PyMethodFlags::METHOD, None).build_method(static_class, vm).into()
 }
 
 /// Create a object type in the Python Runtime.
@@ -43,8 +43,9 @@ pub(super) fn create_object(vm: &VirtualMachine, idx: i32, source: Arc<PixelObje
     // Look to see if class type already exists.
     let class_type = get_class_type_from_cache(&source.type_name);
     if let Some(class_type) = class_type {
+        let class_object: PyObjectRef = class_type.clone().into();
         // One exists, create a new one and add _id
-        let res = class_type.clone().call(FuncArgs::default(), vm).expect("Could not instantiate Python class");
+        let res = class_object.clone().call(FuncArgs::default(), vm).expect("Could not instantiate Python class");
         res.set_attr("_id", vm.ctx.new_int(idx), vm).expect("Could not set _id to Python object.");
 
         return res;
@@ -59,17 +60,18 @@ pub(super) fn create_object(vm: &VirtualMachine, idx: i32, source: Arc<PixelObje
     let class_type = vm.ctx.new_class(None, &source.type_name, vm.ctx.types.object_type.to_owned(), slots);
 
     // Add class methods
+    // Store class type
+    store_class_type_in_cache(&source.type_name, class_type);
+    // Get it again
+    let class_type = get_class_type_from_cache(&source.type_name).unwrap();
     for method in source.callbacks.iter() {
-        let pyfunc = create_object_method(vm, &method.name, method.idx);
-        // add
-        let intern_name = vm.ctx.intern_str(method.name.clone());
-        class_type.set_attr(intern_name, pyfunc.into());
+        let pyfunc = create_object_method(vm, &method.name, method.idx, class_type);
+        // add to __dict__
+        let intern_name = vm.ctx.new_str(method.name.clone());
+        class_type.as_object().set_attr(&intern_name, pyfunc, vm).expect("Could not attach method to Python class.");
     }
 
     let pyobj: PyObjectRef = class_type.clone().into();
-    // Save globally
-    store_class_type_in_cache(&source.type_name, pyobj.clone());
-
     // Attach _id
     let res= pyobj.call(FuncArgs::default(), vm).expect("Could not instantiate Python class");
     res.set_attr("_id", vm.ctx.new_int(idx), vm).expect("Could not set ID to Python object.");
