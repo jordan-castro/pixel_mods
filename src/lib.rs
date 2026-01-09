@@ -9,7 +9,7 @@ use std::{
 use crate::{
     lua::LuaScripting, python::PythonScripting, shared::{
         PixelScript, PixelScriptRuntime, PtrMagic, func::{clear_function_lookup, lookup_add_function}, module::Module, object::{FreeMethod, PixelObject, clear_object_lookup, lookup_add_object}, var::{ObjectMethods, VarType}
-    }
+    },
 };
 
 pub mod shared;
@@ -18,6 +18,7 @@ pub mod shared;
 pub mod lua;
 #[cfg(feature = "python")]
 pub mod python;
+
 
 /// Macro to wrap features
 macro_rules! with_feature {
@@ -565,6 +566,11 @@ pub extern "C" fn pixelscript_var_newf32(val: f32) -> *mut Var {
 #[unsafe(no_mangle)]
 pub extern "C" fn pixelscript_var_newf64(val: f64) -> *mut Var {
     Var::new_f64(val).into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_object_call_rt(runtime: PixelScriptRuntime, var: *mut Var, method: *const c_char, argc: usize, argv: *mut *mut Var) -> *mut Var {
+    pixelscript_object_call(Var::new_i64(runtime as i64).into_raw(), var, method, argc, argv)
 }
 
 /// Object call.

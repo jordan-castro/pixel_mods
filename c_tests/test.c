@@ -1,6 +1,6 @@
 #include "pixel_script.h"
 
-// ========================== AI Generated Code (START) ==========================
+// ========================== C Binding (START) ==========================
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,9 +16,19 @@ typedef struct Person {
 } Person;
 
 // Implementation of the print method
-void print_person_info(Person *self) {
+void print_person_info(PixelScriptRuntime runtime, Person *self) {
     if (self != NULL) {
-        printf("My name is: %s, and I am %d years old\n", self->name, self->age);
+        char* rt = "Unkown";
+        if (runtime == Lua) {
+            rt = "Lua";
+        } else if (runtime == Python) {
+            rt = "Python";
+        } else if (runtime == JavaScript) {
+            rt = "JavaScript";
+        } else if (runtime == Easyjs) {
+            rt = "EasyJS";
+        }
+        printf("From runtime: %s, My name is: %s, and I am %d years old\n", rt, self->name, self->age);
     }
 }
 
@@ -53,7 +63,7 @@ void destroy_person(Person *p) {
     free(p);
 }
 
-// ========================== AI Generated Code (END) ==========================
+// ========================== C Binding (END) ==========================
 
 Var* ps_set_name(uintptr_t argc, struct Var **argv, void *opaque) {
     Var* object = argv[1];
@@ -87,11 +97,14 @@ Var* ps_get_age(uintptr_t argc, struct Var **argv, void *opaque) {
 }
 
 Var* ps_greet(uintptr_t argc, struct Var **argv, void *opaque) { 
+    Var *runtime = argv[0];
     Var *object = argv[1];
 
+    // Runtime var
+    int runtime_int = pixelscript_var_get_i64(runtime);
     Person* p = pixelscript_var_get_host_object(object);
 
-    print_person_info(p);
+    print_person_info(runtime_int, p);
 
     return pixelscript_var_newnull();
 }
@@ -128,13 +141,26 @@ int main() {
 
     // Set the new_person object
     pixelscript_add_object("Person", new_person, NULL);
-    const char* script = "local p = Person('Jordan', 23)\n"
+    
+    // Lua
+    const char* lua_script = "local p = Person('Jordan', 23)\n"
                          "p:greet()\n"
                          "p:set_name('Jordan Castro')\n"
                          "p:greet()\n"
                          "p:set_name('Jordan Castro + ' .. p:get_age())\n"
                          "p:greet()\n";
-    char* res = pixelscript_exec_lua(script, "<ctest>");
+    char* res = pixelscript_exec_lua(lua_script, "<ctest>");
+    pixelscript_free_str(res);
+
+    // Python
+    const char* python_script = "p = Person('Jordan', 23)\n"
+                                "p.greet()\n"
+                                "p.set_name('Jordan Castro')\n"
+                                "p.greet()\n"
+                                "p.set_name(f'Jordan Castro + {p.get_age()}')\n"
+                                "p.greet()\n";
+
+    char* res = pixelscript_exec_python(python_script, "<ctest>");
     pixelscript_free_str(res);
 
     pixelscript_finalize();

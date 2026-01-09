@@ -35,6 +35,16 @@ enum VarType {
 typedef uint32_t VarType;
 
 /**
+ * Public enum for supported runtimes.
+ */
+typedef enum PixelScriptRuntime {
+  Lua,
+  Python,
+  JavaScript,
+  Easyjs,
+} PixelScriptRuntime;
+
+/**
  * A Module is a C representation of data that needs to be (imported,required, etc)
  *
  * The process is you add callbacks, variables, etc.
@@ -404,6 +414,12 @@ struct Var *pixelscript_var_newf32(float val);
  * Create a new variable f64
  */
 struct Var *pixelscript_var_newf64(double val);
+
+struct Var *pixelscript_object_call_rt(enum PixelScriptRuntime runtime,
+                                       struct Var *var,
+                                       const char *method,
+                                       uintptr_t argc,
+                                       struct Var **argv);
 
 /**
  * Object call.

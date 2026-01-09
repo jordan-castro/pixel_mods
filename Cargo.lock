@@ -1284,7 +1284,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pixel_script"
+name = "pixelscript"
 version = "0.1.0"
 dependencies = [
  "anyhow",

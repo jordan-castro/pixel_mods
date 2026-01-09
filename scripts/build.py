@@ -4,6 +4,7 @@
 import glob
 import os
 import shutil
+from subprocess import call
 from pathlib import Path
 
 # 1. Configuration
@@ -50,4 +51,6 @@ def collect_libs():
             print(f" -> Collected Main Crate: {main_lib.name}")
 
 if __name__ == "__main__":
+    # Compile program
+    call(["cargo", "build", "--release"])
     collect_libs()
