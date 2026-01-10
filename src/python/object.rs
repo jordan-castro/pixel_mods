@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rustpython::vm::{AsObject, Py, PyObjectRef, PyPayload, TryFromObject, VirtualMachine, builtins::PyType, convert::{IntoObject, ToPyObject}, function::{FuncArgs, PyMethodFlags}, types::{PyTypeFlags, PyTypeSlots}};
+use rustpython::vm::{AsObject, Py, PyObjectRef, TryFromObject, VirtualMachine, builtins::PyType, convert::ToPyObject, function::{FuncArgs, PyMethodFlags}, types::{PyTypeFlags, PyTypeSlots}};
 
 use crate::{python::{get_class_type_from_cache, pystr_leak, store_class_type_in_cache}, shared::{PixelScriptRuntime, func::call_function, object::PixelObject, var::Var}};
 

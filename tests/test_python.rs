@@ -1,3 +1,4 @@
+// cargo test --test test_python -- --nocapture --test-threads=1
 #[cfg(test)]
 mod tests {
     use std::{

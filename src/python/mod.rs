@@ -1,15 +1,25 @@
-use std::{cell::RefCell, collections::HashMap, sync::{Arc, OnceLock}};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    sync::{Arc, OnceLock},
+};
 
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
-use rustpython::vm::{Interpreter, PyObjectRef, PyRef, Settings, VirtualMachine, builtins::PyType, convert::ToPyObject, function::FsPath, scope::Scope};
+use rustpython::vm::{
+    Interpreter, PyObjectRef, PyRef, Settings, VirtualMachine, builtins::PyType,
+    convert::ToPyObject, function::FsPath, scope::Scope,
+};
 
-use crate::{python::{func::create_function, module::create_module, overrides::override_import_loader}, shared::{PixelScript, read_file}};
+use crate::{
+    python::{func::create_function, module::create_module, overrides::override_import_loader},
+    shared::{PixelScript, read_file},
+};
 
-mod var;
 mod func;
 mod module;
 mod object;
 mod overrides;
+mod var;
 
 /// This is the Python State
 struct State {
@@ -22,14 +32,14 @@ struct State {
     /// Cached class ptrs
     class_ptrs: RefCell<Vec<*mut PyRef<PyType>>>,
     /// Cached leaked names.
-    cached_leaks: RefCell<HashMap<String,  *mut str>>
+    cached_leaks: RefCell<HashMap<String, *mut str>>,
 }
 
 /// Create a string for Python enviroment. String is cached and will be freed later automatically.
-pub(self) unsafe fn pystr_leak(s:String) -> &'static str {
+pub(self) unsafe fn pystr_leak(s: String) -> &'static str {
     let state = get_state();
     if let Some(&ptr) = state.cached_leaks.borrow().get(&s) {
-        return unsafe {&*ptr};
+        return unsafe { &*ptr };
     }
 
     // Convert to box
@@ -40,7 +50,7 @@ pub(self) unsafe fn pystr_leak(s:String) -> &'static str {
     state.cached_leaks.borrow_mut().insert(s, ptr);
 
     // Return as static reference
-    unsafe {&*ptr}
+    unsafe { &*ptr }
 }
 
 /// Get a class type from cache
@@ -60,12 +70,17 @@ pub(self) fn store_class_type_in_cache(type_name: &str, class_type: PyRef<PyType
         // Cache ptr
         &*leaked_ptr // Dereference to get the static ref
     };
-    state.class_types.borrow_mut().insert(type_name.to_string(), class_static);
+    state
+        .class_types
+        .borrow_mut()
+        .insert(type_name.to_string(), class_static);
 }
 
 impl Drop for State {
     fn drop(&mut self) {
+        println!("Drop called");
         self.class_types.borrow_mut().clear();
+        println!("Class types cleared");
 
         for (_, ptr) in self.cached_leaks.borrow_mut().drain() {
             if !ptr.is_null() {
@@ -74,6 +89,7 @@ impl Drop for State {
                 }
             }
         }
+        println!("cached_leaks cleared");
 
         for ptr in self.class_ptrs.borrow().iter() {
             if !ptr.is_null() {
@@ -83,6 +99,7 @@ impl Drop for State {
             }
         }
         self.class_ptrs.borrow_mut().clear();
+        println!("class_ptrs cleared");
     }
 }
 unsafe impl Send for State {}
@@ -98,19 +115,19 @@ fn get_state() -> ReentrantMutexGuard<'static, State> {
         let mut settings = Settings::default();
         settings.path_list.push("".to_string());
         settings.write_bytecode = false;
-        
+
         let interp = rustpython::InterpreterConfig::new()
             .settings(settings)
-            .init_stdlib() 
+            .init_stdlib()
             .interpreter();
 
         let scope = interp.enter(|vm| {
             let globals = vm.ctx.new_dict();
 
             // let sys_modules = vm.sys_module.get_attr("modules", vm).unwrap();
-            
+
             // let modules_dict = sys_modules.downcast::<rustpython::vm::builtins::PyDict>().unwrap();
-            
+
             // Remove dangerous modules from the cache so 'import os' fails
             // let _ = modules_dict.del_item("os", vm);
             // let _ = modules_dict.del_item("io", vm);
@@ -118,15 +135,13 @@ fn get_state() -> ReentrantMutexGuard<'static, State> {
 
             globals.into()
         });
-        ReentrantMutex::new(
-            State { 
-                engine: interp, 
-                global_scope: scope,
-                class_types: RefCell::new(HashMap::new()),
-                cached_leaks: RefCell::new(HashMap::new()),
-                class_ptrs: RefCell::new(vec![])
-            }
-        )
+        ReentrantMutex::new(State {
+            engine: interp,
+            global_scope: scope,
+            class_types: RefCell::new(HashMap::new()),
+            cached_leaks: RefCell::new(HashMap::new()),
+            class_ptrs: RefCell::new(vec![]),
+        })
     });
 
     mutex.lock()
@@ -144,14 +159,26 @@ impl PixelScript for PythonScripting {
     }
 
     fn stop() {
-        // Nothing is really needed to be done here? Except maybe do some GC?
+        println!("Calling stop!");
+        let state = get_state();
+        // Run the GC
+        state.engine.enter(|vm| {
+            if let Ok(gc_module) = vm.import("gc", 0) {
+                if let Ok(collect_func) = gc_module.get_attr("collect", vm) {
+                    let _ = collect_func.call((), vm);
+                }
+            }
+        });
+        println!("After stop");
     }
 
     fn add_variable(name: &str, variable: &crate::shared::var::Var) {
         let state = get_state();
         state.engine.enter(|vm| {
             let var = variable.clone().to_pyobject(vm);
-            vm.builtins.set_attr(unsafe {pystr_leak( name.to_string()) }, var, vm).expect("Could not set Var Python.");
+            vm.builtins
+                .set_attr(unsafe { pystr_leak(name.to_string()) }, var, vm)
+                .expect("Could not set Var Python.");
         });
     }
 
@@ -160,7 +187,9 @@ impl PixelScript for PythonScripting {
         state.engine.enter(|vm| {
             let pyfunc = create_function(vm, name, fn_idx);
             // Attach it
-            vm.builtins.set_attr(unsafe { pystr_leak(name.to_string()) }, pyfunc, vm).expect("Could not set callback Python.");
+            vm.builtins
+                .set_attr(unsafe { pystr_leak(name.to_string()) }, pyfunc, vm)
+                .expect("Could not set callback Python.");
         });
     }
 
@@ -173,19 +202,26 @@ impl PixelScript for PythonScripting {
 
     fn execute(code: &str, file_name: &str) -> String {
         let state = get_state();
-        state.engine.enter(|vm| {
-            let dict = state.global_scope.clone().downcast::<rustpython::vm::builtins::PyDict>().expect("Could not downcast to Dict, Python.");
+        let res = state.engine.enter(|vm| {
+            let dict = state
+                .global_scope
+                .clone()
+                .downcast::<rustpython::vm::builtins::PyDict>()
+                .expect("Could not downcast to Dict, Python.");
             let scope = Scope::with_builtins(None, dict, vm);
 
             match vm.run_code_string(scope, code, file_name.to_string()) {
-                Ok(_) => {
-                    String::from("")
-                },
-                Err(e) => {
-                    e.to_pyobject(vm).str(vm).expect("Could not get error string Python.").as_str().to_string()
-                },
+                Ok(_) => String::from(""),
+                Err(e) => e
+                    .to_pyobject(vm)
+                    .str(vm)
+                    .expect("Could not get error string Python.")
+                    .as_str()
+                    .to_string(),
             }
-        })
+        });
+
+        res
     }
 }
 

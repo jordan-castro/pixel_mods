@@ -1,3 +1,5 @@
+// cargo test --test test_lua -- --nocapture
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -259,4 +261,3 @@ mod tests {
     }
 }
 
-// cargo test --test test_lua -- --nocapture

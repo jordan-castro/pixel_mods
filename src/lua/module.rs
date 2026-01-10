@@ -33,16 +33,6 @@ fn create_module(context: &Lua, module: &Module) -> LuaTable {
             .expect("Could not set callback to module");
     }
 
-    // // Add internal modules
-    // for inner_module in module.modules.iter() {
-    //     // Create a module
-    //     let inner_table = create_module(context, inner_module);
-    //     // Add to this module
-    //     module_table
-    //         .set(inner_module.name.to_owned(), inner_table)
-    //         .expect("Could not create inner module.");
-    // }
-
     module_table
 }
 
@@ -67,6 +57,7 @@ pub fn add_module(module: Arc<Module>, parent: Option<&str>) {
         .get("preload")
         .expect("Could not grab the Preload table");
 
+    // Add internal modules.
     for child in module.modules.iter() {
         let child_module = child.clone();
         add_module(Arc::new(child_module), Some(mod_name.as_str()));
