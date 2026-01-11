@@ -12,6 +12,7 @@ LIB_CRATES = ["mlua", CRATE_NAME]
 SOURCE = "pxsb"
 # TODO: Figure out how WASM will work since it needs to use other libs for it to work, gotta have to link something.
 VALID_EXTENSIONS = ["lib", "a", "so", "dylib"]
+full_lib_size = 0
 
 
 def convert_path(path:str) -> str:
@@ -24,6 +25,8 @@ def get_ext(path) -> str:
 
 
 def move(old):
+    global full_lib_size
+    full_lib_size += os.path.getsize(old)
     old = convert_path(old)
     ext = get_ext(old)
     file_name = old.split('.')[0].split('/')[-1]
@@ -52,3 +55,5 @@ for path in os.listdir(build_dir):
             print(full_path)
             # Search through contents
             collect_libs(full_path)
+
+print(f"Full size of pixelscript: {full_lib_size // 1000000}mb")

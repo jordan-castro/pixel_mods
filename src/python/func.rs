@@ -8,7 +8,7 @@ const PY_SIZE_DEBUG: usize = 24;
 const PY_SIZE_RELEASE: usize = 24;
 
 /// Use instead of the py_arg macro.
-pub unsafe fn py_get_arg(argv: pocketpy::py_StackRef, i: usize) -> pocketpy::py_StackRef {
+pub(super) unsafe fn py_get_arg(argv: pocketpy::py_StackRef, i: usize) -> pocketpy::py_StackRef {
     // 1. Convert the pointer to a raw byte address (u8)
     let base_addr = argv as *mut u8;
 

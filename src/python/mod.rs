@@ -18,6 +18,7 @@ pub(self) mod pocketpy {
 
 mod func;
 mod var;
+mod object;
 
 thread_local! {
     static PYSTATE: ReentrantMutex<State> = ReentrantMutex::new(init_state());

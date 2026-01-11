@@ -1,4 +1,4 @@
-#include "pixel_script.h"
+#include "pixelscript.h"
 
 // ========================== C Binding (START) ==========================
 
@@ -125,7 +125,7 @@ Var* new_person(uintptr_t argc, struct Var **argv, void *opaque) {
     pixelscript_free_str(name_str);
 
     // Create new object
-    PixelObject* object = pixelscript_new_object(p, destroy_person);
+    PixelObject* object = pixelscript_new_object(p, destroy_person, "Person");
     // Add methods
     pixelscript_object_add_callback(object, "set_name", ps_set_name, NULL);
     pixelscript_object_add_callback(object, "get_name", ps_get_name, NULL);
