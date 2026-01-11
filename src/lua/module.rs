@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use crate::{
-    lua::{func::internal_add_callback, get_lua_state},
-    shared::module::Module,
+    lua::{func::internal_add_callback, get_lua_state, into_lua},
+    shared::{PtrMagic, module::Module, var::Var},
 };
 use mlua::prelude::*;
 
@@ -12,13 +12,11 @@ fn create_module(context: &Lua, module: &Module) -> LuaTable {
 
     // Add variables
     for variable in module.variables.iter() {
+        let var = unsafe {Var::from_borrow(variable.var) };
         module_table
             .set(
                 variable.name.to_owned(),
-                variable
-                    .var
-                    .clone()
-                    .into_lua(context)
+                    into_lua(context, var)
                     .expect("Could not convert variable to Lua."),
             )
             .expect("Could not set variable to module.");

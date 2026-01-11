@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use rustpython::vm::{PyObjectRef, VirtualMachine, convert::ToPyObject};
+use rustpython_vm::{PyObjectRef, VirtualMachine};
 
-use crate::{python::create_function, shared::module::Module};
+use crate::{python::{create_function, var_to_pyobject}, shared::{PtrMagic, module::Module, var::Var}};
 
 fn create_internal_module(vm: &VirtualMachine, module: &Module, parent_path: Option<&str>) -> PyObjectRef {
     let m_dict = vm.ctx.new_dict();
@@ -18,7 +18,9 @@ fn create_internal_module(vm: &VirtualMachine, module: &Module, parent_path: Opt
 
     // Variables
     for variable in module.variables.iter() {
-        m_dict.set_item(&variable.name, variable.var.clone().to_pyobject(vm), vm).expect("Could not set a variable in Python module.");
+        let var = unsafe { Var::from_borrow(variable.var) };
+        let pyobj = var_to_pyobject(vm, var);
+        m_dict.set_item(&variable.name, pyobj, vm).expect("Could not set a variable in Python module.");
     }
 
     // Callbacks

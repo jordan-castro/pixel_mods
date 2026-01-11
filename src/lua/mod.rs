@@ -5,9 +5,13 @@ pub mod var;
 
 use mlua::prelude::*;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
-use std::{cell::RefCell, collections::HashMap, sync::{OnceLock}};
+use std::{cell::RefCell, collections::HashMap};
 
-use crate::shared::{PixelScript, object::get_object, read_file, var::{ObjectMethods, Var}};
+use crate::{lua::var::{from_lua, into_lua}, shared::{PixelScript, object::get_object, read_file, var::{ObjectMethods}}};
+
+thread_local! {
+    static LUASTATE: ReentrantMutex<State> = ReentrantMutex::new(init_state());
+}
 
 /// This is the Lua state. Each language gets it's own private state
 struct State {
@@ -17,19 +21,21 @@ struct State {
     tables: RefCell<HashMap<String, LuaTable>>
 }
 
-/// The State static variable for Lua.
-static STATE: OnceLock<ReentrantMutex<State>> = OnceLock::new();
+/// Initialize Lua state per thread.
+fn init_state() -> State {
+    State {
+        engine: Lua::new(),
+        tables: RefCell::new(HashMap::new()),
+    }
+}
 
 /// Get the state of LUA.
 fn get_lua_state() -> ReentrantMutexGuard<'static, State> {
-    let mutex = STATE.get_or_init(|| {
-        ReentrantMutex::new(State { 
-            engine: Lua::new(), 
-            tables: RefCell::new(HashMap::new()) 
-        })
-    });
-    // This will 
-    mutex.lock()
+    LUASTATE.with(|mutex| {
+        let guard = mutex.lock();
+        // Transmute the lifetime so the guard can be passed around the thread
+        unsafe { std::mem::transmute(guard) }
+    })
 }
 
 /// Get a cached metatable from lua.
@@ -99,7 +105,7 @@ pub struct LuaScripting;
 
 impl PixelScript for LuaScripting {
     fn add_variable(name: &str, variable: &crate::shared::var::Var) {
-        var::add_variable(&get_lua_state().engine, name, variable.clone());
+        var::add_variable(&get_lua_state().engine, name, variable);
     }
 
     fn add_callback(
@@ -166,17 +172,15 @@ impl ObjectMethods for LuaScripting {
         {
             // State start
             let state = get_lua_state();
-            for arg in args {
-                lua_args.push(arg.into_lua(&state.engine).expect("Could not convert Var into Lua Var"));
+            for arg in args.iter() {
+                lua_args.push(into_lua(&state.engine, arg).expect("Could not convert Var into Lua Var"));
             }
             // State drop
         }
         // The function could potentially call the state
         let res = table.call_function(method, lua_args).expect("Could not call function on Lua Table.");
 
-        // State start again
-        let state = get_lua_state();
-        let pixel_res = Var::from_lua(res, &state.engine).expect("Could not convert LuaVar into PixelScript Var.");
+        let pixel_res = from_lua(res).expect("Could not convert LuaVar into PixelScript Var.");
 
         Ok(pixel_res)
         // Drop state

@@ -9,9 +9,11 @@ crate-type = ["staticlib", "rlib"]
 [dependencies]
 mlua = { version = "0.11", features = ["lua54", "vendored", "send"], optional = true }
 anyhow = "1.0.100"
-rustpython = { version = "0.4.0", optional = true, features = ["freeze-stdlib"] }
+rustpython-vm = { version = "0.4.0", default-features = false, features = ["compiler", "codegen"], optional = true }
+rustpython-compiler = {version = "0.4.0", optional = true}
 rand = { version = "0.9.2", features = ["small_rng"] }
 parking_lot = "0.12.5"
+thread_local = "1.1.9"
 
 [build-dependencies]
 cbindgen = "0.29.2"
@@ -22,6 +24,13 @@ default = ["lua", "python"]
 # Include LUA scripting.
 lua = ["dep:mlua"]
 # Include Python scripting.
-python = ["dep:rustpython"]
+python = ["dep:rustpython-vm", "dep:rustpython-compiler"]
 
 all = ["lua", "python"]
+
+[profile.release]
+opt-level = "z"
+strip = true
+lto = true
+codegen-units = 1
+panic = "abort"

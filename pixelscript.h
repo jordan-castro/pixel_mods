@@ -252,8 +252,10 @@ void pixelscript_finalize(void);
 /**
  * Add a variable to the __main__ context.
  * Gotta pass in a name, and a Variable value.
+ *
+ * Transfers variable ownership.
  */
-void pixelscript_add_variable(const char *name, const struct Var *variable);
+void pixelscript_add_variable(const char *name, struct Var *variable);
 
 /**
  * Add a callback to the __main__ context.
@@ -301,10 +303,12 @@ void pixelscript_module_add_callback(struct Module *module_ptr,
  * Add a Varible to a module.
  *
  * Pass in the module pointer and variable params.
+ *
+ * Variable ownership is transfered.
  */
 void pixelscript_module_add_variable(struct Module *module_ptr,
                                      const char *name,
-                                     const struct Var *variable);
+                                     struct Var *variable);
 
 /**
  * Add a Module to a Module
@@ -542,5 +546,12 @@ void pixelscript_set_file_reader(LoadFileFn func);
  * This is used to read a dir.
  */
 void pixelscript_set_dir_reader(ReadDirFn func);
+
+/**
+ * Free a PixelScript var.
+ *
+ * You should only free results from `pixelscript_object_call`
+ */
+void pixelscript_free_var(struct Var *var);
 
 #endif  /* PIXEL_SCRIPT_H */

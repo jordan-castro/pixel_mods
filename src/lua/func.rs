@@ -1,7 +1,7 @@
 use mlua::prelude::*;
 // use mlua::{Integer, IntoLua, Lua, MultiValue, Value::Nil, Variadic};
 
-use crate::{lua::get_lua_state, shared::{PixelScriptRuntime, func::call_function, var::Var}};
+use crate::{lua::{from_lua, get_lua_state, into_lua}, shared::{PixelScriptRuntime, func::call_function, var::Var}};
 
 /// For internal use since modules also need to use the same logic for adding a Lua callback.
 pub(super) fn internal_add_callback(lua: &Lua, fn_idx: i32) -> LuaFunction {
@@ -20,13 +20,13 @@ pub(super) fn internal_add_callback(lua: &Lua, fn_idx: i32) -> LuaFunction {
         // }
 
         for arg in args {
-            argv.push(Var::from_lua(arg, lua).expect("Could not convert value into Var from Lua."));
+            argv.push(from_lua(arg).expect("Could not convert value into Var from Lua."));
         }        
 
         unsafe {
             let res = call_function(fn_idx, argv);
 
-            let lua_val = res.into_lua(lua);
+            let lua_val = into_lua(lua, &res);
             lua_val
             // Memory will drop here, and Var will be automatically freed!
         }

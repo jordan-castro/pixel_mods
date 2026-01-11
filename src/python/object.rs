@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use rustpython::vm::{AsObject, Py, PyObjectRef, TryFromObject, VirtualMachine, builtins::PyType, convert::ToPyObject, function::{FuncArgs, PyMethodFlags}, types::{PyTypeFlags, PyTypeSlots}};
+use rustpython_vm::{AsObject, Py, PyObjectRef, VirtualMachine, builtins::PyType, function::{FuncArgs, PyMethodFlags}, types::{PyTypeFlags, PyTypeSlots}};
 
-use crate::{python::{get_class_type_from_cache, pystr_leak, store_class_type_in_cache}, shared::{PixelScriptRuntime, func::call_function, object::PixelObject, var::Var}};
+use crate::{python::{get_class_type_from_cache, pystr_leak, store_class_type_in_cache, var::pyobject_to_var, var_to_pyobject}, shared::{PixelScriptRuntime, func::call_function, object::PixelObject, var::Var}};
 
 /// Create object callback methods
 fn create_object_method(vm: &VirtualMachine, fn_name: &str, fn_idx: i32, static_class: &'static Py<PyType>) -> PyObjectRef {
@@ -23,13 +23,14 @@ fn create_object_method(vm: &VirtualMachine, fn_name: &str, fn_idx: i32, static_
         argv.push(Var::new_i64(obj_id));
 
         for arg in args.args.iter().skip(1) {
-            argv.push(Var::try_from_object(vm, arg.to_owned()).expect("Could not convert value into Var from Python."));
+            let var_arg = pyobject_to_var(vm, arg.to_owned()).expect("Could not convert value into Var from Python.");
+            argv.push(var_arg);
         }
 
         unsafe {
             // Call actual function
             let res = call_function(fn_idx, argv);
-            res.to_pyobject(vm)
+            var_to_pyobject(vm, &res)
         }
     }, PyMethodFlags::METHOD, None).build_method(static_class, vm).into()
 }

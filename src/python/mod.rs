@@ -1,18 +1,18 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
-    sync::{Arc, OnceLock},
+    sync::Arc,
 };
 
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
-use rustpython::vm::{
-    Interpreter, PyObjectRef, PyRef, Settings, VirtualMachine, builtins::PyType,
-    convert::ToPyObject, function::FsPath, scope::Scope,
+use rustpython_vm::{
+    Interpreter, PyObjectRef, PyRef, Settings, builtins::PyType,
+    convert::ToPyObject, scope::Scope,
 };
 
 use crate::{
-    python::{func::create_function, module::create_module, overrides::override_import_loader},
-    shared::{PixelScript, read_file},
+    python::{func::create_function, module::create_module, overrides::{add_bundled_stdlib, override_import_loader}, var::var_to_pyobject},
+    shared::{PixelScript},
 };
 
 mod func;
@@ -20,6 +20,10 @@ mod module;
 mod object;
 mod overrides;
 mod var;
+
+thread_local! {
+    static PYSTATE: ReentrantMutex<State> = ReentrantMutex::new(init_state());
+}
 
 /// This is the Python State
 struct State {
@@ -33,6 +37,15 @@ struct State {
     class_ptrs: RefCell<Vec<*mut PyRef<PyType>>>,
     /// Cached leaked names.
     cached_leaks: RefCell<HashMap<String, *mut str>>,
+}
+
+/// Get the current threads python state
+pub(self) fn get_state() -> ReentrantMutexGuard<'static, State> {
+    PYSTATE.with(|mutex| {
+        let guard = mutex.lock();
+        // Transmute the lifetime so the guard can be passed around the thread
+        unsafe { std::mem::transmute(guard) }
+    })
 }
 
 /// Create a string for Python enviroment. String is cached and will be freed later automatically.
@@ -78,10 +91,6 @@ pub(self) fn store_class_type_in_cache(type_name: &str, class_type: PyRef<PyType
 
 impl Drop for State {
     fn drop(&mut self) {
-        println!("Drop called");
-        self.class_types.borrow_mut().clear();
-        println!("Class types cleared");
-
         for (_, ptr) in self.cached_leaks.borrow_mut().drain() {
             if !ptr.is_null() {
                 unsafe {
@@ -89,62 +98,57 @@ impl Drop for State {
                 }
             }
         }
-        println!("cached_leaks cleared");
 
-        for ptr in self.class_ptrs.borrow().iter() {
+        let ptrs_len = self.class_ptrs.borrow().len();
+        for ptr in self.class_ptrs.borrow_mut().drain(0..ptrs_len) {
             if !ptr.is_null() {
                 unsafe {
-                    let _ = Box::from_raw(ptr.to_owned());
+                    let _ = Box::from_raw(ptr);
                 }
             }
         }
         self.class_ptrs.borrow_mut().clear();
-        println!("class_ptrs cleared");
     }
 }
 unsafe impl Send for State {}
 unsafe impl Sync for State {}
 
-/// The State static variable for Lua.
-static STATE: OnceLock<ReentrantMutex<State>> = OnceLock::new();
+// /// The State static variable for Lua.
+// static STATE: OnceLock<ReentrantMutex<State>> = OnceLock::new();
 
 /// Get the state of Python.
-fn get_state() -> ReentrantMutexGuard<'static, State> {
-    let mutex = STATE.get_or_init(|| {
-        // Initialize state inside
-        let mut settings = Settings::default();
-        settings.path_list.push("".to_string());
-        settings.write_bytecode = false;
+fn init_state() -> State {
+    // Initialize state inside
+    let mut settings = Settings::default();
+    settings.path_list.push("".to_string());
+    settings.write_bytecode = false;
 
-        let interp = rustpython::InterpreterConfig::new()
-            .settings(settings)
-            .init_stdlib()
-            .interpreter();
+    let interp = Interpreter::without_stdlib(settings);
 
-        let scope = interp.enter(|vm| {
-            let globals = vm.ctx.new_dict();
+    let scope = interp.enter(|vm| {
+        let globals = vm.ctx.new_dict();
+        add_bundled_stdlib(vm);
+        override_import_loader(vm);
 
-            // let sys_modules = vm.sys_module.get_attr("modules", vm).unwrap();
+        // let sys_modules = vm.sys_module.get_attr("modules", vm).unwrap();
 
-            // let modules_dict = sys_modules.downcast::<rustpython::vm::builtins::PyDict>().unwrap();
+        // let modules_dict = sys_modules.downcast::<rustpython::vm::builtins::PyDict>().unwrap();
 
-            // Remove dangerous modules from the cache so 'import os' fails
-            // let _ = modules_dict.del_item("os", vm);
-            // let _ = modules_dict.del_item("io", vm);
-            // let _ = modules_dict.del_item("shutil", vm);
+        // Remove dangerous modules from the cache so 'import os' fails
+        // let _ = modules_dict.del_item("os", vm);
+        // let _ = modules_dict.del_item("io", vm);
+        // let _ = modules_dict.del_item("shutil", vm);
 
-            globals.into()
-        });
-        ReentrantMutex::new(State {
-            engine: interp,
-            global_scope: scope,
-            class_types: RefCell::new(HashMap::new()),
-            cached_leaks: RefCell::new(HashMap::new()),
-            class_ptrs: RefCell::new(vec![]),
-        })
+        globals.into()
     });
 
-    mutex.lock()
+    State {
+        engine: interp,
+        global_scope: scope,
+        class_types: RefCell::new(HashMap::new()),
+        class_ptrs: RefCell::new(vec![]),
+        cached_leaks: RefCell::new(HashMap::new()),
+    }
 }
 
 pub struct PythonScripting {}
@@ -152,33 +156,27 @@ pub struct PythonScripting {}
 impl PixelScript for PythonScripting {
     fn start() {
         // Initalize the state
-        let state = get_state();
-        state.engine.enter(|vm| {
-            override_import_loader(vm, state.global_scope.clone());
-        });
+        let _state = get_state();
     }
 
     fn stop() {
-        println!("Calling stop!");
-        let state = get_state();
-        // Run the GC
-        state.engine.enter(|vm| {
-            if let Ok(gc_module) = vm.import("gc", 0) {
-                if let Ok(collect_func) = gc_module.get_attr("collect", vm) {
-                    let _ = collect_func.call((), vm);
-                }
-            }
-        });
-        println!("After stop");
+        // let state = get_state();
+        // // Run the GC
+        // state.engine.enter(|vm| {
+        //     if let Ok(gc_module) = vm.import("gc", 0) {
+        //         if let Ok(collect_func) = gc_module.get_attr("collect", vm) {
+        //             let _ = collect_func.call((), vm);
+        //         }
+        //     }
+        // });
     }
 
     fn add_variable(name: &str, variable: &crate::shared::var::Var) {
         let state = get_state();
         state.engine.enter(|vm| {
-            let var = variable.clone().to_pyobject(vm);
-            vm.builtins
-                .set_attr(unsafe { pystr_leak(name.to_string()) }, var, vm)
-                .expect("Could not set Var Python.");
+            let var = var_to_pyobject(vm, variable);
+            println!("Got var");
+            state.global_scope.set_item(name, var, vm).expect("Could not set Var Python.");
         });
     }
 
@@ -206,7 +204,7 @@ impl PixelScript for PythonScripting {
             let dict = state
                 .global_scope
                 .clone()
-                .downcast::<rustpython::vm::builtins::PyDict>()
+                .downcast::<rustpython_vm::builtins::PyDict>()
                 .expect("Could not downcast to Dict, Python.");
             let scope = Scope::with_builtins(None, dict, vm);
 
@@ -225,7 +223,22 @@ impl PixelScript for PythonScripting {
     }
 }
 
-// TODO: this but for Python
+// // TODO: this but for Python
+// impl ObjectMethods for PythonScripting {
+//     fn object_call(var: &Var, method: &str, args: Vec<Var>) -> Result<Var, anyhow::Error> {
+//         // Get Python obj
+//         let pyobj = unsafe {
+//             if var.is_host_object() {
+
+//             } else {
+//                 // Just grab the ptr from itself
+//                 let ptr = var.value.object_val as *const PyObjectRef;
+//                 // Deferenciate
+                
+//             }
+//         };
+//     }
+// }
 
 // impl ObjectMethods for LuaScripting {
 //     fn object_call(

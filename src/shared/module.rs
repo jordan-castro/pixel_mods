@@ -51,7 +51,7 @@ pub struct ModuleCallback {
 #[derive(Clone)]
 pub struct ModuleVariable {
     pub name: String,
-    pub var: Var,
+    pub var: *mut Var,
 }
 
 impl Module {
@@ -75,10 +75,10 @@ impl Module {
     }
 
     /// Add a variable to current module.
-    pub fn add_variable(&mut self, name: &str, var: &Var) {
+    pub fn add_variable(&mut self, name: &str, var: *mut Var) {
         self.variables.push(ModuleVariable {
             name: name.to_string(),
-            var: var.clone(),
+            var: var,
         });
     }
 
@@ -98,3 +98,12 @@ unsafe impl Sync for ModuleCallback {}
 
 unsafe impl Send for ModuleVariable {}
 unsafe impl Sync for ModuleVariable {}
+
+impl Drop for Module {
+    fn drop(&mut self) {
+        for var in self.variables.drain(0..self.variables.len()) {
+            // Drop the variable.
+            let _ = Var::from_raw(var.var);
+        }
+    }
+}

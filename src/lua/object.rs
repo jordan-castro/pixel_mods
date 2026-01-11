@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{lua::{get_metatable, store_metatable}, shared::{PixelScriptRuntime, func::call_function, object::PixelObject, var::Var}};
+use crate::{lua::{from_lua, get_metatable, into_lua, store_metatable}, shared::{PixelScriptRuntime, func::call_function, object::PixelObject, var::Var}};
 use mlua::prelude::*;
 
 fn create_object_callback(lua: &Lua, fn_idx: i32) -> LuaFunction {
@@ -18,14 +18,14 @@ fn create_object_callback(lua: &Lua, fn_idx: i32) -> LuaFunction {
 
         // Add args
         for arg in args {
-            argv.push(Var::from_lua(arg, lua).expect("Could not convert Lua Value into Var."));
+            argv.push(from_lua(arg).expect("Could not convert Lua Value into Var."));
         }
 
         // Call
         unsafe {
             let res = call_function(fn_idx, argv);
             // Convert into lua
-            let lua_val = res.into_lua(lua);
+            let lua_val = into_lua(lua, &res);
             lua_val
         }
     }).expect("Could not create function on object")

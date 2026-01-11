@@ -29,9 +29,7 @@
 - Optomize Object creation. Potentially doing at `add` rather than callbacks.
 
 ## Vars
-- add var_is_* type methods to clib
 - add Array type which holds many Vars.
-- add Dict type
 
 ## STD
 - Add std library via pixelscript runtime. These are optional and handled via features
@@ -42,13 +40,28 @@
 
 ## Lua
 
-## Python
+## Python (RustPython)
+- Remove STDlib
+- object.call
+
+## Python (PocketPy)
+- Write bindings in build.rs
+- add_variable
+- add_callback
+- add_module
+- add_object
+- module_add_variable
+- module_add_callback
+- module_add_object
+- object.call
+- custom imports
+- execute_python
 
 ## JS
 - add_variable
 - add_callback
 - add_module
-- execute_js
+- execute_javascript
 - module_add_variable
 - module_add_callback
 - module_add_module
@@ -61,3 +74,15 @@
 - module_add_variable
 - module_add_callback
 - module_add_module
+
+## Starlark ([url](https://github.com/facebook/starlark-rust))
+- add_variable
+- add_callback
+- add_module
+- add_object
+- module_add_variable
+- module_add_callback
+- module_add_object
+- object.call
+- custom imports
+- execute_starlark

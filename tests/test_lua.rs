@@ -179,13 +179,22 @@ mod tests {
     #[test]
     fn test_add_variable() {
         pixelscript_initialize();
-        LuaScripting::add_variable("name", &Var::new_string(String::from("Jordan")));
+        let name = create_raw_string!("name");
+        let jordan = create_raw_string!("Jordan");
+        let var = pixelscript_var_newstring(jordan);
+        println!("New variable");
+        pixelscript_add_variable(name, var);
+        println!("Added variable");
+        free_raw_string!(name);
+        free_raw_string!(jordan);
+
+        println!("Finished?");
     }
 
     #[test]
     fn test_add_callback() {
         pixelscript_initialize();
-        let name = create_raw_string!("println");
+        let name = create_raw_string!("print");
         pixelscript_add_callback(name, print_wrapper, ptr::null_mut());
         free_raw_string!(name);
     }
@@ -200,8 +209,10 @@ mod tests {
         let n1_name = create_raw_string!("n1");
         let n2_name = create_raw_string!("n2");
         pixelscript_module_add_callback(module, add_name, add_wrapper, ptr::null_mut());
-        pixelscript_module_add_variable(module, n1_name, &Var::new_i64(1));
-        pixelscript_module_add_variable(module, n2_name, &Var::new_i64(2));
+        let n1 = pixelscript_var_newi64(1);
+        let n2 = pixelscript_var_newi64(2);
+        pixelscript_module_add_variable(module, n1_name, n1);
+        pixelscript_module_add_variable(module, n2_name, n2);
 
         pixelscript_add_module(module);
 
@@ -235,23 +246,26 @@ mod tests {
             ft_object.function_from_outside()
 
             local msg = "Welcome, " .. name
-            println(msg)
+            print(msg)
 
             local math = require("cmath")
 
             local result = math.add(math.n1, math.n2)
-            println(tostring(math.n1))
-            println(tostring(math.n2))
-            println(tostring(result))
-            println("Module result: " .. tostring(result))
+            print(tostring(math.n1))
+            print(tostring(math.n2))
+            print(tostring(result))
+            print("Module result: " .. tostring(result))
 
             if result ~= 3 then
                 error("Math, Expected 3, got " .. tostring(result))
             end
             local person = Person("Jordan")
-            println(person:get_name())
+            print(person:get_name())
             person:set_name("Jordan Castro")
-            println(person:get_name())
+            print(person:get_name())
+
+            print('Calling internal print?')
+            print(Person)
         "#;
         let err = LuaScripting::execute(lua_code, "<test>");
 

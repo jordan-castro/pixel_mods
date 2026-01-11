@@ -1,49 +1,52 @@
 use std::{ffi::c_void, sync::Arc};
 
-use rustpython::vm::{PyObject, PyObjectRef, TryFromObject, convert::ToPyObject};
+use rustpython_vm::{PyObject, PyObjectRef, PyResult, VirtualMachine};
 
 use crate::{python::object::create_object, shared::{object::get_object, var::Var}};
 
-impl ToPyObject for Var {
-    fn to_pyobject(self, vm: &rustpython::vm::VirtualMachine) -> rustpython::vm::PyObjectRef {
-        match self.tag {
+/// Convert Var to PyObjectRef
+pub(super) fn var_to_pyobject(vm: &VirtualMachine, var: &Var) -> PyObjectRef {
+    match var.tag {
             crate::shared::var::VarType::Int32 => {
-                vm.ctx.new_int(self.get_i32().unwrap()).into()
+                vm.ctx.new_int(var.get_i32().unwrap()).into()
             },
             crate::shared::var::VarType::Int64 => {
-                vm.ctx.new_int(self.get_i64().unwrap()).into()
+                vm.ctx.new_int(var.get_i64().unwrap()).into()
             },
             crate::shared::var::VarType::UInt32 => {
-                vm.ctx.new_int(self.get_u32().unwrap()).into()
+                vm.ctx.new_int(var.get_u32().unwrap()).into()
             },
             crate::shared::var::VarType::UInt64 => {
-                vm.ctx.new_int(self.get_u64().unwrap()).into()
+                vm.ctx.new_int(var.get_u64().unwrap()).into()
             },
             crate::shared::var::VarType::String => {
-                let contents = self.get_string().unwrap();
+                let contents = var.get_string().expect("Could not get String.");
                 vm.ctx.new_str(contents).into()
             },
             crate::shared::var::VarType::Bool => {
-                vm.ctx.new_bool(self.get_bool().unwrap()).into()
+                vm.ctx.new_bool(var.get_bool().unwrap()).into()
             },
             crate::shared::var::VarType::Float32 => {
-                vm.ctx.new_float(self.get_bigfloat()).into()
+                vm.ctx.new_float(var.get_bigfloat()).into()
             },
             crate::shared::var::VarType::Float64 => {
-                vm.ctx.new_float(self.get_bigfloat()).into()
+                vm.ctx.new_float(var.get_bigfloat()).into()
             },
             crate::shared::var::VarType::Null => vm.ctx.none(),
             crate::shared::var::VarType::Object => {
                 unsafe {
+                    if var.value.object_val.is_null() {
+                        return vm.ctx.none();
+                    }
                     // This is a Python Class
-                    let pyobj_ptr = self.value.object_val as *const PyObject;
+                    let pyobj_ptr = var.value.object_val as *const PyObject;
 
                     PyObjectRef::from_raw(pyobj_ptr)
                 }
             },
             crate::shared::var::VarType::HostObject => {
                 unsafe {
-                    let idx = self.value.host_object_val;
+                    let idx = var.value.host_object_val;
                     let pixel_object = get_object(idx).unwrap();
                     let lang_ptr_is_null = pixel_object.lang_ptr.lock().unwrap().is_null();
                     if lang_ptr_is_null {
@@ -62,11 +65,10 @@ impl ToPyObject for Var {
                 }
             },
         }
-    }
 }
 
-impl TryFromObject for Var {
-    fn try_from_object(vm: &rustpython::vm::VirtualMachine, obj: rustpython::vm::PyObjectRef) -> rustpython::vm::PyResult<Self> {
+/// Convert a PyObjectRef into a Var
+pub(super) fn pyobject_to_var(vm: &VirtualMachine, obj: PyObjectRef) -> PyResult<Var> {
         // Null
         if vm.is_none(&obj) {
             return Ok(Var::new_null());
@@ -104,7 +106,5 @@ impl TryFromObject for Var {
 
         // Get the ptr to pyobject
         let ptr = PyObjectRef::into_raw(obj);
-
         Ok(Var::new_object(ptr as *mut c_void))
-    }
-}
+} 

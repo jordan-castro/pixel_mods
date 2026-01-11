@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use rand::{Rng, SeedableRng, distr::Alphanumeric, rngs::SmallRng};
 use shared::{func::Func, var::Var};
 use std::{
@@ -6,8 +7,13 @@ use std::{
     sync::Arc,
 };
 
+#[cfg(feature="lua")]
+use crate::lua::LuaScripting;
+#[cfg(feature="python")]
+use crate::python::PythonScripting;
+
 use crate::{
-    lua::LuaScripting, python::PythonScripting, shared::{
+     shared::{
         LoadFileFn, PixelScript, PixelScriptRuntime, PtrMagic, ReadDirFn, func::{clear_function_lookup, lookup_add_function}, get_pixel_state, module::Module, object::{FreeMethod, PixelObject, clear_object_lookup, lookup_add_object}, var::{ObjectMethods, VarType}
     },
 };
@@ -26,6 +32,18 @@ macro_rules! with_feature {
         #[cfg(feature=$feature)]
         {
             $logic
+        }
+    };
+    ($feature:literal, $logic:block, $fallback:block) => {
+        {
+            #[cfg(feature = $feature)]
+            {
+                $logic
+            }
+            #[cfg(not(feature = $feature))]
+            {
+                $fallback
+            }
         }
     };
 }
@@ -163,8 +181,10 @@ pub extern "C" fn pixelscript_finalize() {
 
 /// Add a variable to the __main__ context.
 /// Gotta pass in a name, and a Variable value.
+/// 
+/// Transfers variable ownership.
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_add_variable(name: *const c_char, variable: &Var) {
+pub extern "C" fn pixelscript_add_variable(name: *const c_char, variable: *mut Var) {
     assert_initiated!();
     if name.is_null() {
         return;
@@ -176,14 +196,21 @@ pub extern "C" fn pixelscript_add_variable(name: *const c_char, variable: &Var) 
         return;
     }
 
+    // Own Variable
+    let var = if variable.is_null() {
+        Var::new_null()
+    } else {  Var::from_raw(variable) };
+
     // Add variable to lua context
     with_feature!("lua", {
-        LuaScripting::add_variable(r_str, variable);
+        LuaScripting::add_variable(r_str, &var);
     });
 
     with_feature!("python", {
-        PythonScripting::add_variable(r_str, variable);
+        PythonScripting::add_variable(r_str, &var);
     });
+    
+    // Var get's dropped. Memory is copied
 }
 
 /// Add a callback to the __main__ context.
@@ -325,11 +352,13 @@ pub extern "C" fn pixelscript_module_add_callback(
 /// Add a Varible to a module.
 ///
 /// Pass in the module pointer and variable params.
+/// 
+/// Variable ownership is transfered.
 #[unsafe(no_mangle)]
 pub extern "C" fn pixelscript_module_add_variable(
     module_ptr: *mut Module,
     name: *const c_char,
-    variable: &Var,
+    variable: *mut Var,
 ) {
     assert_initiated!();
     if module_ptr.is_null() {
@@ -600,7 +629,7 @@ pub extern "C" fn pixelscript_object_call(runtime: *mut Var, var: *mut Var, meth
     let var_borrow = unsafe {Var::from_borrow(var)};
     let method_borrow = borrow_string!(method);
     let argv_borrow: &[*mut Var] = unsafe {Var::slice_raw(argv, argc)};
-    let args = argv_borrow.iter()
+    let args: Vec<Var> = argv_borrow.iter()
         .filter(|ptr| !ptr.is_null()) // Always check for nulls from C
         .map(|&ptr| (unsafe { (*ptr).clone() }).clone())   // Dereference and clone
         .collect();
@@ -631,13 +660,22 @@ pub extern "C" fn pixelscript_object_call(runtime: *mut Var, var: *mut Var, meth
     }
 
     // This is tricky since we need to know what runtime we are using...
-    let var = match runtime {
+    let var: Result<Var, anyhow::Error> = match runtime {
         PixelScriptRuntime::Lua => {
             with_feature!("lua", {
                 LuaScripting::object_call(var_borrow, method_borrow, args)
+            }, {
+                Ok(Var::new_null())
+                // Result::Err(anyhow!("TODO"))
             })
         },
-        PixelScriptRuntime::Python => todo!(),
+        PixelScriptRuntime::Python => {
+            with_feature!("python", {
+                Ok(Var::new_null())
+            }, {
+                Ok(Var::new_null())
+            })
+        },
         PixelScriptRuntime::JavaScript => todo!(),
         PixelScriptRuntime::Easyjs => todo!(),
     };
@@ -809,4 +847,18 @@ pub extern "C" fn pixelscript_set_dir_reader(func: ReadDirFn) {
     let state = get_pixel_state();
     let mut read_dir = state.read_dir.borrow_mut();
     *read_dir = Some(func);
+}
+
+/// Free a PixelScript var.
+/// 
+/// You should only free results from `pixelscript_object_call`
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_free_var(var: *mut Var) {
+    assert_initiated!();
+
+    if var.is_null() {
+        return;
+    }
+
+    let _ = Var::from_raw(var);
 }

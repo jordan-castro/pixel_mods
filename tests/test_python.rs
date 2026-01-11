@@ -176,10 +176,16 @@ mod tests {
     #[test]
     fn test_add_variable() {
         pixelscript_initialize();
-        PythonScripting::add_variable("name", &Var::new_string(String::from("Jordan")));
+        let name = create_raw_string!("name");
+        let jordan = create_raw_string!("Jordan");
+        let var = pixelscript_var_newstring(jordan);
+        pixelscript_add_variable(name, var);
+        free_raw_string!(name);
+        free_raw_string!(jordan);
     }
+
     #[test]
-   fn test_add_callback() {
+    fn test_add_callback() {
         pixelscript_initialize();
         let name = create_raw_string!("println");
         pixelscript_add_callback(name, print_wrapper, ptr::null_mut());
@@ -196,8 +202,10 @@ mod tests {
         let n1_name = create_raw_string!("n1");
         let n2_name = create_raw_string!("n2");
         pixelscript_module_add_callback(module, add_name, add_wrapper, ptr::null_mut());
-        pixelscript_module_add_variable(module, n1_name, &Var::new_i64(1));
-        pixelscript_module_add_variable(module, n2_name, &Var::new_i64(2));
+        let n1 = pixelscript_var_newi64(1);
+        let n2 = pixelscript_var_newi64(2);
+        pixelscript_module_add_variable(module, n1_name, n1);
+        pixelscript_module_add_variable(module, n2_name, n2);
 
         pixelscript_add_module(module);
 
@@ -228,6 +236,8 @@ mod tests {
 
         let py_code = r#"
 import ps_math
+import sys
+print(f"DEBUG META_PATH: {sys.meta_path}")
 from pad.ft_object import function_from_outside 
 
 function_from_outside() # Should print something

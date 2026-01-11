@@ -1,6 +1,6 @@
-use rustpython::vm::{PyObjectRef, TryFromObject, VirtualMachine, convert::{ToPyObject, ToPyResult}, function::FuncArgs};
+use rustpython_vm::{PyObjectRef, VirtualMachine, convert::{ToPyObject}, function::FuncArgs};
 
-use crate::{python::pystr_leak, shared::{PixelScriptRuntime, func::call_function, var::Var}};
+use crate::{python::{pystr_leak, var::{pyobject_to_var, var_to_pyobject}}, shared::{PixelScriptRuntime, func::call_function, var::Var}};
 
 /// Attach a function to a Python context.
 /// 
@@ -22,12 +22,12 @@ pub(super) fn create_function(vm: &VirtualMachine, fn_name: &str, fn_idx: i32) -
 
         // Now Python vars
         for arg in args.args {
-            argv.push(Var::try_from_object(vm, arg).expect("Could not convert value into Var from Python."));
+            argv.push(pyobject_to_var(vm, arg).expect("Could not convert value into Var from Python."));
         }
 
         unsafe {
             let res = call_function(fn_idx, argv);
-            res.to_pyresult(vm).expect("Could not convert Var into Python result").to_pyobject(vm)
+            var_to_pyobject(vm, &res).to_pyobject(vm)
         }
     });
 
