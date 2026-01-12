@@ -1,10 +1,10 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::{HashMap, HashSet}};
 
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 
 use crate::{
     create_raw_string, free_raw_string, own_string,
-    python::{func::pocketpy_bridge, var::var_to_pocketpyref},
+    python::{func::pocketpy_bridge, module::create_module, var::var_to_pocketpyref},
     shared::PixelScript,
 };
 
@@ -19,6 +19,7 @@ pub(self) mod pocketpy {
 mod func;
 mod var;
 mod object;
+mod module;
 
 thread_local! {
     static PYSTATE: ReentrantMutex<State> = ReentrantMutex::new(init_state());
@@ -27,14 +28,43 @@ thread_local! {
 /// This is the Pocketpy state. Each language gets it's own private state
 struct State {
     /// Name to IDX lookup for pocketpy bridge
-    name_to_idx: RefCell<HashMap<String, i32>>,
+    name_to_idx: RefCell<HashMap<i32, HashMap<String, i32>>>,
+
+    /// Keep a list of defined PixelObject as class
+    defined_objects: RefCell<HashMap<i32, HashSet<String>>>,
+    
+    /// Current thread idx
+    thread_idx: RefCell<i32>
 }
 
-fn exec_main_py(code: &str, name: &str) -> String {
+pub(self) fn exec_py(code: &str, name: &str, module: &str) -> String {
+    let c_code = create_raw_string!(code);
+    let c_name = create_raw_string!(name);
+    let c_module = create_raw_string!(module);
+
+    unsafe {
+        let pymodule = pocketpy::py_getmodule(c_module);
+        let res = pocketpy::py_exec(c_code, c_name, pocketpy::py_CompileMode_EXEC_MODE, pymodule);
+        free_raw_string!(c_code);
+        free_raw_string!(c_name);
+        free_raw_string!(c_module);
+
+        if !res {
+            let py_res = pocketpy::py_formatexc();
+            let py_res = own_string!(py_res);
+
+            py_res
+        } else {
+            String::new()
+        }
+    }
+}
+
+fn run_py(code: &str, name: &str, comp_mode: pocketpy::py_CompileMode) -> String {
     let c_code = create_raw_string!(code);
     let c_name = create_raw_string!(name);
     unsafe {
-        let res = pocketpy::py_exec(c_code, c_name, pocketpy::py_CompileMode_EXEC_MODE, std::ptr::null_mut());
+        let res = pocketpy::py_exec(c_code, c_name, comp_mode, std::ptr::null_mut());
         free_raw_string!(c_code);
         free_raw_string!(c_name);
         if !res {
@@ -48,10 +78,35 @@ fn exec_main_py(code: &str, name: &str) -> String {
     }
 }
 
+pub(self) fn eval_main_py(code: &str, name: &str) -> String {
+run_py(code, name, pocketpy::py_CompileMode_EVAL_MODE)
+}
+
+pub(self) fn exec_main_py(code: &str, name: &str) -> String {
+    run_py(code, name, pocketpy::py_CompileMode_EXEC_MODE)
+    // let c_code = create_raw_string!(code);
+    // let c_name = create_raw_string!(name);
+    // unsafe {
+    //     let res = pocketpy::py_exec(c_code, c_name, pocketpy::py_CompileMode_EXEC_MODE, std::ptr::null_mut());
+    //     free_raw_string!(c_code);
+    //     free_raw_string!(c_name);
+    //     if !res {
+    //         let py_res = pocketpy::py_formatexc();
+    //         let py_res = own_string!(py_res);
+
+    //         py_res
+    //     } else {
+    //         String::new()
+    //     }
+    // }
+}
+
 /// Initialize Lua state per thread.
 fn init_state() -> State {
     State {
         name_to_idx: RefCell::new(HashMap::new()),
+        defined_objects: RefCell::new(HashMap::new()),
+        thread_idx: RefCell::new(0)
     }
 }
 
@@ -67,14 +122,57 @@ pub(self) fn get_py_state() -> ReentrantMutexGuard<'static, State> {
 /// Add a new name => idx
 pub(self) fn add_new_name_idx_fn(name: String, idx: i32) {
     let state = get_py_state();
-    state.name_to_idx.borrow_mut().insert(name, idx);
+    let t = state.thread_idx.borrow();
+    let mut names = state.name_to_idx.borrow_mut();
+    if let Some(h) = names.get_mut(&t) {
+        h.insert(name, idx);
+    } else {
+        let mut map = HashMap::new();
+        map.insert(name, idx);
+        names.insert(t.clone(), map);
+    }
 }
 
 /// Get a IDX from a name
 pub(self) fn get_fn_idx_from_name(name: &str) -> Option<i32> {
     let state = get_py_state();
-    let fn_idx = state.name_to_idx.borrow().get(name).cloned();
-    fn_idx
+    let t = state.thread_idx.borrow();
+    if let Some(m) = state.name_to_idx.borrow().get(&t){
+        m.get(name).cloned()
+    } else {
+        None
+    }
+}
+
+/// Add a new defined object
+pub(self) fn add_new_defined_object(name: &str) {
+    let state = get_py_state();
+    let t = state.thread_idx.borrow();
+    let mut names = {
+        if let Some(names) = state.defined_objects.borrow_mut().get(&t).cloned() {
+            names
+        } else {
+            let set = HashSet::new();
+            set
+        }
+    };
+
+    names.insert(name.to_string());
+} 
+
+/// Check if a object is already defined
+pub(self) fn is_object_defined(name: &str) -> bool {
+    let state = get_py_state();
+    let t = state.thread_idx.borrow();
+    if let Some(set) = state.defined_objects.borrow().get(&t) {
+        set.contains(name)
+    } else {
+        false
+    }
+} 
+
+pub(self) fn make_private(name: &str) -> String {
+    format!("_pxs_{}", name)
 }
 
 pub struct PythonScripting;
@@ -85,7 +183,7 @@ impl PixelScript for PythonScripting {
         unsafe {
             pocketpy::py_initialize();
         }
-        let s = exec_main_py("1 + 1", "<init>");
+        let _s = exec_main_py("1 + 1", "<init>");
         let _state = get_py_state();
     }
 
@@ -115,14 +213,13 @@ impl PixelScript for PythonScripting {
         add_new_name_idx_fn(name.to_string(), idx);
 
         // Create a "private" name
-        let private_name = format!("_pxs_{name}");
+        let private_name = make_private(name);
 
         let c_name = create_raw_string!(private_name.clone());
         let c_main = create_raw_string!("__main__");
         let bridge_code = format!(
             r#"
 def {name}(*args):
-    print(*args)
     return {private_name}('{name}', *args)
 "#
         );
@@ -134,14 +231,13 @@ def {name}(*args):
 
             // Execute bridge
             let s = exec_main_py(&bridge_code, &c_brige_name);
-            println!("{s}");
             free_raw_string!(c_name);
             free_raw_string!(c_main);
         }
     }
 
     fn add_module(source: std::sync::Arc<crate::shared::module::Module>) {
-        todo!()
+        create_module(&source, None);
     }
 
     fn execute(code: &str, file_name: &str) -> String {
@@ -151,16 +247,20 @@ def {name}(*args):
     
     fn start_thread() {
         unsafe {
-            let idx = pocketpy::py_currentvm();
-            pocketpy::py_switchvm(idx + 1);
+            let idx = pocketpy::py_currentvm() + 1;
+            pocketpy::py_switchvm(idx);
+            let state = get_py_state();
+            *(state.thread_idx.borrow_mut()) = idx;
         }
     }
     
     fn stop_thread() {
         unsafe {
-            let idx = pocketpy::py_currentvm();
+            let idx = pocketpy::py_currentvm() - 1;
             pocketpy::py_resetvm();
-            pocketpy::py_switchvm(idx - 1);
+            pocketpy::py_switchvm(idx);
+            let state = get_py_state();
+            *(state.thread_idx.borrow_mut()) = idx;
         }
     }
 }

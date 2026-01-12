@@ -562,6 +562,6 @@ void pixelscript_start_thread(void);
 /**
  * Tells PixelScript that we just stopped the most recent thread.
  */
-void pixelscritp_stop_thread(void);
+void pixelscript_stop_thread(void);
 
 #endif  /* PIXEL_SCRIPT_H */

@@ -837,7 +837,7 @@ pub extern "C" fn pixelscript_start_thread() {
 
 /// Tells PixelScript that we just stopped the most recent thread.
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscritp_stop_thread() {
+pub extern "C" fn pixelscript_stop_thread() {
     with_feature!("lua", {
         LuaScripting::stop_thread();
     });

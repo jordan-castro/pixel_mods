@@ -78,6 +78,8 @@ pub struct PixelObject {
     pub ptr: *mut c_void,
     /// The language object pointer.
     pub lang_ptr: Mutex<*mut c_void>,
+    /// Should the lang_ptr be freed by PixelScript?
+    pub free_lang_ptr: Mutex<bool>,
     /// The Method for freeing
     pub free_method: FreeMethod,
     /// Callbacks with names.
@@ -96,7 +98,8 @@ impl PixelObject {
             free_method,
             callbacks: vec![],
             lang_ptr: Mutex::new(ptr::null_mut()),
-            type_name: type_name.to_string()
+            type_name: type_name.to_string(),
+            free_lang_ptr: Mutex::new(true)
         }
     }
 
@@ -118,6 +121,12 @@ impl PixelObject {
 
         *guard = n_ptr;
     }
+
+    pub fn update_free_lang_ptr(&self, val: bool) {
+        let mut guard = self.free_lang_ptr.lock().unwrap();
+
+        *guard = val;
+    }
 }
 
 impl PtrMagic for PixelObject {}
@@ -126,9 +135,11 @@ unsafe impl Sync for PixelObject {}
 impl Drop for PixelObject {
     fn drop(&mut self) {
         let mut lang_ptr = self.lang_ptr.lock().unwrap();
-        if !lang_ptr.is_null() {
-            //  Free Language memory
-            let _ = unsafe { Box::from_raw(*lang_ptr) };
+        if *self.free_lang_ptr.lock().unwrap() {
+            if !lang_ptr.is_null() {
+                //  Free Language memory
+                let _ = unsafe { Box::from_raw(*lang_ptr) };
+            }
         }
         *lang_ptr = ptr::null_mut();
         // Free host memory

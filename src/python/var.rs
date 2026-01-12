@@ -1,6 +1,6 @@
-use std::ffi::c_void;
+use std::{ffi::c_void, sync::Arc};
 
-use crate::{borrow_string, create_raw_string, free_raw_string, python::pocketpy, shared::{object::get_object, var::{Var, VarType}}};
+use crate::{borrow_string, create_raw_string, free_raw_string, python::{object::create_object, pocketpy}, shared::{object::get_object, var::{Var, VarType}}};
 
 /// Convert a PocketPy ref into a Var
 pub(super) fn pocketpyref_to_var(pref: pocketpy::py_Ref) -> Var {
@@ -71,9 +71,16 @@ pub(super) fn var_to_pocketpyref(out: pocketpy::py_Ref, var: &Var) {
             crate::shared::var::VarType::HostObject => {
                 let idx = var.value.host_object_val;
                 let pixel_object = get_object(idx).unwrap();
+                // DO NOT FREE POCKETPY memory.
+                pixel_object.update_free_lang_ptr(false);
                 let lang_ptr_is_null = pixel_object.lang_ptr.lock().unwrap().is_null();
                 if lang_ptr_is_null {
                     // TODO: Create the object for the first time...
+                    create_object(idx, Arc::clone(&pixel_object));
+                    // Get py_retval
+                    let pyobj = pocketpy::py_retval();
+                    // Set that as the pointer
+                    pixel_object.update_lang_ptr(pyobj as *mut c_void);
                 }
                 // Get PTR again
                 let lang_ptr = pixel_object.lang_ptr.lock().unwrap();
@@ -85,17 +92,6 @@ pub(super) fn var_to_pocketpyref(out: pocketpy::py_Ref, var: &Var) {
 }
 
 // RUST PYTHON OLD VERSION
-            // crate::shared::var::VarType::Object => {
-            //     unsafe {
-            //         if var.value.object_val.is_null() {
-            //             return vm.ctx.none();
-            //         }
-            //         // This is a Python Class
-            //         let pyobj_ptr = var.value.object_val as *const PyObject;
-
-            //         PyObjectRef::from_raw(pyobj_ptr)
-            //     }
-            // },
             // crate::shared::var::VarType::HostObject => {
             //     unsafe {
             //         let idx = var.value.host_object_val;

@@ -5,6 +5,7 @@ macro_rules! borrow_string {
         if $cstr.is_null() {
             ""
         } else {
+            #[allow(unused_unsafe)]
             unsafe {
                 let c_str = std::ffi::CStr::from_ptr($cstr);
                 c_str.to_str().unwrap_or("")
@@ -22,6 +23,7 @@ macro_rules! own_string {
         if $cstr.is_null() {
             String::new()
         } else {
+            #[allow(unused_unsafe)]
             let owned_string = unsafe { std::ffi::CString::from_raw($cstr) };
 
             owned_string
