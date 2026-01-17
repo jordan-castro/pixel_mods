@@ -203,6 +203,7 @@ pub(self) fn make_private(name: &str) -> String {
 unsafe extern "C" fn import_file(arg1: *const std::ffi::c_char) -> *mut std::ffi::c_char {
     // Borrow string
     let b = borrow_string!(arg1);
+    println!("b: {b}");
     // Remove .py and check if this is a directory
     let file_path = {
         let pos_dir = &b[0..b.len() - 3];
@@ -213,20 +214,10 @@ unsafe extern "C" fn import_file(arg1: *const std::ffi::c_char) -> *mut std::ffi
             format!("{pos_dir}__import__.py")
         } else {
             // No __import__.py so let's see first if there is any .py so we can return a pseudo type
-            let mut found = false;
-            for file in files.iter() {
-                if file.ends_with(".py") {
-                    found = true;
-                    break;
-                }
-            }
-
-            if found {
-                // So we have some python, lets use it.
+            for _ in files.iter() {
                 return create_raw_string!("");
-            } else {
-                b.to_string()
             }
+            b.to_string()
         }
     };
 
