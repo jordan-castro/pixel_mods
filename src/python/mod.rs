@@ -299,27 +299,31 @@ impl ObjectMethods for PythonScripting {
         method: &str,
         args: &Vec<&mut crate::shared::var::Var>,
     ) -> Result<crate::shared::var::Var, anyhow::Error> {
-        // Get the pyref
-        let pyref = unsafe { pocketpy::py_getreg(0) };
-        var_to_pocketpyref(pyref, var);
+        // Get the object ref
+        let obj_ref = unsafe { pocketpy::py_getreg(0) };
+        var_to_pocketpyref(obj_ref, var);
 
         let method_name = create_raw_string!(method);
         // Call a method on it.
         unsafe {
             let pymethod_name = pocketpy::py_name(method_name);
-            pocketpy::py_getattr(pyref, pymethod_name);
+            pocketpy::py_getattr(obj_ref, pymethod_name);
             // Get the result pushed to the stack.
             let pymethod = pocketpy::py_retval();
+            free_raw_string!(method_name);
+
+            // Push self
+            pocketpy::py_push(obj_ref);
 
             // Convert args into py_Ref
             for i in 0..args.len() {
-                let pyref = pocketpy::py_getreg(i  as i32);
+                let pyref = pocketpy::py_getreg((i + 1)  as i32);
                 var_to_pocketpyref(pyref, &args[i]);
                 pocketpy::py_push(pyref);
             }
 
             // Now call
-            pocketpy::py_call(pymethod, args.len() as i32, std::ptr::null_mut());
+            pocketpy::py_call(pymethod, (args.len() + 1) as i32, std::ptr::null_mut());
         }
 
         // Result is py_retval
@@ -335,9 +339,9 @@ impl ObjectMethods for PythonScripting {
             let pymethod = pocketpy::py_getglobal(pymethod_name);
 
             for i in 0..args.len() {
-                let pyref = pocketpy::py_getreg((i + 1) as i32);
-                var_to_pocketpyref(pyref, &args[i]);
-                pocketpy::py_push(pyref);
+                let tmp_reg = pocketpy::py_getreg(0);
+                var_to_pocketpyref(tmp_reg, &args[i]);
+                pocketpy::py_push(tmp_reg);
             }
 
             // Call
