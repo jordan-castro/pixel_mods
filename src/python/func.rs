@@ -11,7 +11,7 @@ use crate::{
     python::{
         get_fn_idx_from_name, pocketpy, var::pocketpyref_to_var, var_to_pocketpyref,
     },
-    shared::{PixelScriptRuntime, func::call_function, var::Var},
+    shared::{PixelScriptRuntime, func::call_function, var::pxs_Var},
 };
 
 /// The size of the Python bug in debug modes.
@@ -85,10 +85,10 @@ pub(super) unsafe extern "C" fn pocketpy_bridge(argc: i32, argv: pocketpy::py_St
     let fn_idx = fn_idx.unwrap();
 
     // Convert argv into Vec<Var>
-    let mut vars: Vec<Var> = vec![];
+    let mut vars: Vec<pxs_Var> = vec![];
 
     // Add the runtime
-    vars.push(Var::new_i64(PixelScriptRuntime::Python as i64));
+    vars.push(pxs_Var::new_i64(PixelScriptRuntime::Python as i64));
 
     for i in 1..argc {
         let arg_ref = unsafe { py_get_arg(argv, i as usize) };

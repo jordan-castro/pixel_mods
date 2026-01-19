@@ -18,7 +18,7 @@ mod tests {
 
     use pixelscript::{
         lua::LuaScripting,
-        shared::{PixelScript, PtrMagic, object::PixelObject, var::Var},
+        shared::{PixelScript, PtrMagic, object::pxs_PixelObject, var::pxs_Var},
         *,
     };
 
@@ -64,51 +64,51 @@ mod tests {
         let _ = unsafe { Person::from_borrow(ptr as *mut Person) };
     }
 
-    pub extern "C" fn set_name(argc: usize, argv: *mut *mut Var, _opaque: *mut c_void) -> *mut Var {
+    pub extern "C" fn set_name(argc: usize, argv: *mut *mut pxs_Var, _opaque: *mut c_void) -> *mut pxs_Var {
         unsafe {
-            let args = Var::slice_raw(argv, argc);
+            let args = pxs_Var::slice_raw(argv, argc);
             // Get ptr
-            let pixel_object_var = Var::from_borrow(args[1]);
+            let pixel_object_var = pxs_Var::from_borrow(args[1]);
             let host_ptr = pixel_object_var.get_host_ptr();
             let p = Person::from_borrow(host_ptr as *mut Person);
 
             // Check if first arg is self or nme
             let name = {
-                let first_arg = Var::from_borrow(args[2]);
+                let first_arg = pxs_Var::from_borrow(args[2]);
                 if first_arg.is_string() {
                     first_arg
                 } else {
-                    Var::from_borrow(args[3])
+                    pxs_Var::from_borrow(args[3])
                 }
             };
 
             p.set_name(name.get_string().unwrap().clone());
 
-            Var::into_raw(Var::new_null())
+            pxs_Var::into_raw(pxs_Var::new_null())
         }
     }
 
-    pub extern "C" fn get_name(argc: usize, argv: *mut *mut Var, _opaque: *mut c_void) -> *mut Var {
+    pub extern "C" fn get_name(argc: usize, argv: *mut *mut pxs_Var, _opaque: *mut c_void) -> *mut pxs_Var {
         unsafe {
-            let args = Var::slice_raw(argv, argc);
+            let args = pxs_Var::slice_raw(argv, argc);
 
             // Get ptr
-            let pixel_object_var = Var::from_borrow(args[1]);
+            let pixel_object_var = pxs_Var::from_borrow(args[1]);
             let host_ptr = pixel_object_var.get_host_ptr();
             let p = Person::from_borrow(host_ptr as *mut Person);
 
-            Var::new_string(p.get_name().clone()).into_raw()
+            pxs_Var::new_string(p.get_name().clone()).into_raw()
         }
     }
 
     pub extern "C" fn new_person(
         argc: usize,
-        argv: *mut *mut Var,
+        argv: *mut *mut pxs_Var,
         opaque: *mut c_void,
-    ) -> *mut Var {
+    ) -> *mut pxs_Var {
         unsafe {
             let args = std::slice::from_raw_parts(argv, argc);
-            let p_name = Var::from_borrow(args[1]);
+            let p_name = pxs_Var::from_borrow(args[1]);
             let p_name = p_name.get_string().unwrap();
             let p = Person::new(p_name.clone());
             let type_name = create_raw_string!("Person");
@@ -132,50 +132,50 @@ mod tests {
     // Testing callbacks
     pub extern "C" fn print_wrapper(
         argc: usize,
-        argv: *mut *mut Var,
+        argv: *mut *mut pxs_Var,
         _opaque: *mut c_void,
-    ) -> *mut Var {
+    ) -> *mut pxs_Var {
         unsafe {
             let args = std::slice::from_raw_parts(argv, argc);
 
-            let var_ptr = Var::from_borrow(args[1]);
+            let var_ptr = pxs_Var::from_borrow(args[1]);
 
             if let Ok(msg) = var_ptr.get_string() {
                 println!("Lua sent: {}", msg);
             }
         }
 
-        Var::new_null().into_raw()
+        pxs_Var::new_null().into_raw()
     }
 
     pub extern "C" fn add_wrapper(
         argc: usize,
-        argv: *mut *mut Var,
+        argv: *mut *mut pxs_Var,
         _opaque: *mut c_void,
-    ) -> *mut Var {
+    ) -> *mut pxs_Var {
         // Assumes n1 and n2
         unsafe {
             let args = std::slice::from_raw_parts(argv, argc);
 
-            let n1 = Var::from_borrow(args[1]);
-            let n2 = Var::from_borrow(args[2]);
+            let n1 = pxs_Var::from_borrow(args[1]);
+            let n2 = pxs_Var::from_borrow(args[2]);
 
-            Var::new_i64(n1.value.i64_val + n2.value.i64_val).into_raw()
+            pxs_Var::new_i64(n1.value.i64_val + n2.value.i64_val).into_raw()
         }
     }
     pub extern "C" fn sub_wrapper(
         argc: usize,
-        argv: *mut *mut Var,
+        argv: *mut *mut pxs_Var,
         _opaque: *mut c_void,
-    ) -> *mut Var {
+    ) -> *mut pxs_Var {
         // Assumes n1 and n2
         unsafe {
             let args = std::slice::from_raw_parts(argv, argc);
 
-            let n1 = Var::from_borrow(args[1]);
-            let n2 = Var::from_borrow(args[2]);
+            let n1 = pxs_Var::from_borrow(args[1]);
+            let n2 = pxs_Var::from_borrow(args[2]);
 
-            Var::new_i64(n2.value.i64_val - n1.value.i64_val).into_raw()
+            pxs_Var::new_i64(n2.value.i64_val - n1.value.i64_val).into_raw()
         }
     }
 

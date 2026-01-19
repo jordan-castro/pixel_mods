@@ -6,10 +6,7 @@
 //
 // Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 //
-use crate::shared::{
-    PtrMagic,
-    var::Var,
-};
+use crate::shared::{PtrMagic, var::pxs_Var};
 
 /// A Module is a C representation of data that needs to be (imported,required, etc)
 ///
@@ -36,7 +33,8 @@ use crate::shared::{
 ///
 /// Callbacks within modules use the same FUNCTION_LOOKUP global static variable.
 #[derive(Clone)]
-pub struct Module {
+#[allow(non_camel_case_types)]
+pub struct pxs_Module {
     /// Name of the module.
     pub name: String,
     /// Callbacks that need to be added.
@@ -44,7 +42,7 @@ pub struct Module {
     /// Variables that need to be added.
     pub variables: Vec<ModuleVariable>,
     /// Internal modules
-    pub modules: Vec<Module>,
+    pub modules: Vec<pxs_Module>,
 }
 
 /// Wraps a idx with a name.
@@ -52,20 +50,20 @@ pub struct Module {
 pub struct ModuleCallback {
     pub name: String,
     pub full_name: String,
-    pub idx: i32
+    pub idx: i32,
 }
 
 /// Wraps a Var with a name.
 #[derive(Clone)]
 pub struct ModuleVariable {
     pub name: String,
-    pub var: *mut Var,
+    pub var: *mut pxs_Var,
 }
 
-impl Module {
+impl pxs_Module {
     /// Create a new module.
     pub fn new(name: String) -> Self {
-        Module {
+        pxs_Module {
             name: name,
             callbacks: vec![],
             variables: vec![],
@@ -78,12 +76,12 @@ impl Module {
         self.callbacks.push(ModuleCallback {
             name: name.to_string(),
             full_name: full_name.to_string(),
-            idx
+            idx,
         });
     }
 
     /// Add a variable to current module.
-    pub fn add_variable(&mut self, name: &str, var: *mut Var) {
+    pub fn add_variable(&mut self, name: &str, var: *mut pxs_Var) {
         self.variables.push(ModuleVariable {
             name: name.to_string(),
             var: var,
@@ -91,15 +89,15 @@ impl Module {
     }
 
     /// Add a internal module.
-    pub fn add_module(&mut self, child: Module) {
+    pub fn add_module(&mut self, child: pxs_Module) {
         self.modules.push(child);
     }
 }
 
-impl PtrMagic for Module {}
+impl PtrMagic for pxs_Module {}
 
-unsafe impl Send for Module {}
-unsafe impl Sync for Module {}
+unsafe impl Send for pxs_Module {}
+unsafe impl Sync for pxs_Module {}
 
 unsafe impl Send for ModuleCallback {}
 unsafe impl Sync for ModuleCallback {}
@@ -107,11 +105,11 @@ unsafe impl Sync for ModuleCallback {}
 unsafe impl Send for ModuleVariable {}
 unsafe impl Sync for ModuleVariable {}
 
-impl Drop for Module {
+impl Drop for pxs_Module {
     fn drop(&mut self) {
         for var in self.variables.drain(0..self.variables.len()) {
             // Drop the variable.
-            let _ = Var::from_raw(var.var);
+            let _ = pxs_Var::from_raw(var.var);
         }
     }
 }

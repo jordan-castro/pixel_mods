@@ -6,9 +6,9 @@
 //
 // Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 //
-use crate::{create_raw_string, free_raw_string, python::{add_new_name_idx_fn, exec_py, make_private, pocketpy, pocketpy_bridge, var_to_pocketpyref}, shared::{PtrMagic, module::Module, var::Var}};
+use crate::{create_raw_string, free_raw_string, python::{add_new_name_idx_fn, exec_py, make_private, pocketpy, pocketpy_bridge, var_to_pocketpyref}, shared::{PtrMagic, module::pxs_Module, var::pxs_Var}};
 
-pub(super) fn create_module(module: &Module, parent: Option<&str>) {
+pub(super) fn create_module(module: &pxs_Module, parent: Option<&str>) {
     // Get module name
     let module_name = match parent {
         Some(s) => format!("{s}.{}", module.name),
@@ -24,7 +24,7 @@ pub(super) fn create_module(module: &Module, parent: Option<&str>) {
         let var_name = var.name.clone();
         let c_var_name = create_raw_string!(var_name);
         let r0 = unsafe { pocketpy::py_getreg(0) };
-        var_to_pocketpyref(r0, unsafe{Var::from_borrow(var.var)});
+        var_to_pocketpyref(r0, unsafe{pxs_Var::from_borrow(var.var)});
         
         // Set
         unsafe {

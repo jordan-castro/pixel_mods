@@ -69,7 +69,7 @@ typedef enum PixelScriptRuntime {
  *
  * Callbacks within modules use the same FUNCTION_LOOKUP global static variable.
  */
-typedef struct Module Module;
+typedef struct pxs_Module pxs_Module;
 
 /**
  * A PixelScript Object.
@@ -137,7 +137,7 @@ typedef struct Module Module;
  *
  * This is why a Objects are more like Pseudo types than actual class/objects.
  */
-typedef struct PixelObject PixelObject;
+typedef struct pxs_PixelObject pxs_PixelObject;
 
 /**
  * The Variables actual value union.
@@ -178,7 +178,7 @@ typedef union VarValue {
  *
  * When creating a object, this is a bit tricky but essentially you have to first create a pointer via the pixel script runtime.
  */
-typedef struct Var {
+typedef struct pxs_Var {
   /**
    * A tag for the variable type.
    */
@@ -187,7 +187,7 @@ typedef struct Var {
    * A value as a union.
    */
   union VarValue value;
-} Var;
+} pxs_Var;
 
 /**
  * Function reference used in C.
@@ -200,7 +200,7 @@ typedef struct Var {
  *
  * But if you use any Vars within the function, you will have to free them before the function returns.
  */
-typedef struct Var *(*Func)(uintptr_t argc, struct Var **argv, void *opaque);
+typedef struct pxs_Var *(*pxs_Func)(uintptr_t argc, struct pxs_Var **argv, void *opaque);
 
 typedef void (*FreeMethod)(void *ptr);
 
@@ -219,7 +219,7 @@ typedef void (*WriteFileFn)(const char *file_path, const char *contents);
  *
  * Host owns memory.
  */
-typedef struct DirHandle {
+typedef struct pxs_DirHandle {
   /**
    * The Length of the array
    */
@@ -228,12 +228,12 @@ typedef struct DirHandle {
    * The array values
    */
   char **values;
-} DirHandle;
+} pxs_DirHandle;
 
 /**
  * Function Type for reading a Dir.
  */
-typedef struct DirHandle (*ReadDirFn)(const char *dir_path);
+typedef struct pxs_DirHandle (*ReadDirFn)(const char *dir_path);
 
 /**
  * Current pixelscript version.
@@ -274,14 +274,17 @@ void pixelscript_free_str(char *string);
 /**
  * Create a new pixelscript Module.
  */
-struct Module *pixelscript_new_module(const char *name);
+struct pxs_Module *pixelscript_new_module(const char *name);
 
 /**
  * Add a callback to a module.
  *
  * Pass in the modules pointer and callback paramaters.
  */
-void pixelscript_add_callback(struct Module *module_ptr, const char *name, Func func, void *opaque);
+void pixelscript_add_callback(struct pxs_Module *module_ptr,
+                              const char *name,
+                              pxs_Func func,
+                              void *opaque);
 
 /**
  * Add a Varible to a module.
@@ -290,26 +293,28 @@ void pixelscript_add_callback(struct Module *module_ptr, const char *name, Func 
  *
  * Variable ownership is transfered.
  */
-void pixelscript_add_variable(struct Module *module_ptr, const char *name, struct Var *variable);
+void pixelscript_add_variable(struct pxs_Module *module_ptr,
+                              const char *name,
+                              struct pxs_Var *variable);
 
 /**
  * Add a Module to a Module
  *
  * This transfers ownership.
  */
-void pixelscript_add_submodule(struct Module *parent_ptr, struct Module *child_ptr);
+void pixelscript_add_submodule(struct pxs_Module *parent_ptr, struct pxs_Module *child_ptr);
 
 /**
  * Add the module finally to the runtime.
  *
  * After this you can forget about the ptr since PM handles it.
  */
-void pixelscript_add_module(struct Module *module_ptr);
+void pixelscript_add_module(struct pxs_Module *module_ptr);
 
 /**
  * Optionally free a module if you changed your mind.
  */
-void pixelscript_free_module(struct Module *module_ptr);
+void pixelscript_free_module(struct pxs_Module *module_ptr);
 
 /**
  * Create a new object.
@@ -318,16 +323,16 @@ void pixelscript_free_module(struct Module *module_ptr);
  *
  * This must be wrapped in a `pixelscript_var_object` before use within a callback. If setting to a variable, this is done automatically for you.
  */
-struct PixelObject *pixelscript_new_object(void *ptr,
-                                           FreeMethod free_method,
-                                           const char *type_name);
+struct pxs_PixelObject *pixelscript_new_object(void *ptr,
+                                               FreeMethod free_method,
+                                               const char *type_name);
 
 /**
  * Add a callback to a object.
  */
-void pixelscript_object_add_callback(struct PixelObject *object_ptr,
+void pixelscript_object_add_callback(struct pxs_PixelObject *object_ptr,
                                      const char *name,
-                                     Func callback,
+                                     pxs_Func callback,
                                      void *opaque);
 
 /**
@@ -358,9 +363,9 @@ void pixelscript_object_add_callback(struct PixelObject *object_ptr,
  * let p = new Person("Jordan", 23);
  * ```
  */
-void pixelscript_add_object(struct Module *module_ptr,
+void pixelscript_add_object(struct pxs_Module *module_ptr,
                             const char *name,
-                            Func object_constructor,
+                            pxs_Func object_constructor,
                             void *opaque);
 
 /**
@@ -368,12 +373,12 @@ void pixelscript_add_object(struct Module *module_ptr,
  *
  * Does take ownership
  */
-struct Var *pixelscript_var_newstring(char *str);
+struct pxs_Var *pixelscript_var_newstring(char *str);
 
 /**
  * Make a new Null var.
  */
-struct Var *pixelscript_var_newnull(void);
+struct pxs_Var *pixelscript_var_newnull(void);
 
 /**
  * Make a new HostObject var.
@@ -382,33 +387,33 @@ struct Var *pixelscript_var_newnull(void);
  *
  * Transfers ownership
  */
-struct Var *pixelscript_var_newhost_object(struct PixelObject *pixel_object);
+struct pxs_Var *pixelscript_var_newhost_object(struct pxs_PixelObject *pixel_object);
 
 /**
  * Create a new variable int. (i64)
  */
-struct Var *pixelscript_var_newint(int64_t val);
+struct pxs_Var *pixelscript_var_newint(int64_t val);
 
 /**
  * Create a new variable uint. (u64)
  */
-struct Var *pixelscript_var_newuint(uint64_t val);
+struct pxs_Var *pixelscript_var_newuint(uint64_t val);
 
 /**
  * Create a new variable bool.
  */
-struct Var *pixelscript_var_newbool(bool val);
+struct pxs_Var *pixelscript_var_newbool(bool val);
 
 /**
  * Create a new variable float. (f64)
  */
-struct Var *pixelscript_var_newfloat(double val);
+struct pxs_Var *pixelscript_var_newfloat(double val);
 
-struct Var *pixelscript_object_call_rt(enum PixelScriptRuntime runtime,
-                                       struct Var *var,
-                                       const char *method,
-                                       uintptr_t argc,
-                                       struct Var **argv);
+struct pxs_Var *pixelscript_object_call_rt(enum PixelScriptRuntime runtime,
+                                           struct pxs_Var *var,
+                                           const char *method,
+                                           uintptr_t argc,
+                                           struct pxs_Var **argv);
 
 /**
  * Object call.
@@ -424,31 +429,31 @@ struct Var *pixelscript_object_call_rt(enum PixelScriptRuntime runtime,
  *     Var name = pixelscript_object_call()
  * ```
  */
-struct Var *pixelscript_object_call(struct Var *runtime,
-                                    struct Var *var,
-                                    const char *method,
-                                    uintptr_t argc,
-                                    struct Var **argv);
+struct pxs_Var *pixelscript_object_call(struct pxs_Var *runtime,
+                                        struct pxs_Var *var,
+                                        const char *method,
+                                        uintptr_t argc,
+                                        struct pxs_Var **argv);
 
 /**
  * Get a int (i64) from a var.
  */
-int64_t pixelscript_var_get_int(struct Var *var);
+int64_t pixelscript_var_get_int(struct pxs_Var *var);
 
 /**
  * Get a uint (u64)
  */
-uint64_t pixelscript_var_get_uint(struct Var *var);
+uint64_t pixelscript_var_get_uint(struct pxs_Var *var);
 
 /**
  * Get a float (f64)
  */
-double pixelscript_var_get_float(struct Var *var);
+double pixelscript_var_get_float(struct pxs_Var *var);
 
 /**
  * Get a Bool
  */
-bool pixelscript_var_get_bool(struct Var *var);
+bool pixelscript_var_get_bool(struct pxs_Var *var);
 
 /**
  * Get a String
@@ -457,24 +462,24 @@ bool pixelscript_var_get_bool(struct Var *var);
  *
  * You have to free this memory by calling `pixelscript_free_str`
  */
-char *pixelscript_var_get_string(struct Var *var);
+char *pixelscript_var_get_string(struct pxs_Var *var);
 
 /**
  * Get the pointer of the Host Object
  *
  * This is "potentially" dangerous.
  */
-void *pixelscript_var_get_host_object(struct Var *var);
+void *pixelscript_var_get_host_object(struct pxs_Var *var);
 
 /**
  * Get the IDX of the PixelObject
  */
-int32_t pixelscript_var_get_object_idx(struct Var *var);
+int32_t pixelscript_var_get_object_idx(struct pxs_Var *var);
 
 /**
  * Check if a variable is of a type.
  */
-bool pixelscript_var_is(struct Var *var, VarType var_type);
+bool pixelscript_var_is(struct pxs_Var *var, VarType var_type);
 
 /**
  * Set a function for reading a file.
@@ -502,7 +507,7 @@ void pixelscript_set_dir_reader(ReadDirFn func);
  *
  * You should only free results from `pixelscript_object_call`
  */
-void pixelscript_free_var(struct Var *var);
+void pixelscript_free_var(struct pxs_Var *var);
 
 /**
  * Tells PixelScript that we are in a new thread.
@@ -519,6 +524,6 @@ void pixelscript_stop_thread(void);
  *
  * Host must free this memory with `pixelscript_free_var`
  */
-struct Var *pixelscript_var_tostring(struct Var *runtime, struct Var *var);
+struct pxs_Var *pixelscript_var_tostring(struct pxs_Var *runtime, struct pxs_Var *var);
 
 #endif  /* PIXEL_SCRIPT_H */

@@ -14,7 +14,7 @@ use std::{
 
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 
-use crate::{own_string, shared::var::Var};
+use crate::{own_string, shared::var::pxs_Var};
 
 /// Helper methods/macros for using PixelScript
 pub mod ffi;
@@ -31,17 +31,21 @@ pub mod var;
 ///
 /// Host owns memory.
 #[repr(C)]
-pub struct DirHandle {
+#[allow(non_camel_case_types)]
+pub struct pxs_DirHandle {
     /// The Length of the array
     pub length: usize,
     /// The array values
     pub values: *mut *mut c_char,
 }
 
-impl DirHandle {
+impl pxs_DirHandle {
     /// Empty Dir Handle
     pub fn empty() -> Self {
-        DirHandle { length: 0, values: std::ptr::null_mut() }
+        pxs_DirHandle {
+            length: 0,
+            values: std::ptr::null_mut(),
+        }
     }
 
     /// Get a Vec<String> from the DirHandle.
@@ -64,7 +68,7 @@ impl DirHandle {
     }
 }
 
-impl Drop for DirHandle {
+impl Drop for pxs_DirHandle {
     fn drop(&mut self) {
         if self.length == 0 || self.values.is_null() {
             return;
@@ -84,7 +88,7 @@ pub type LoadFileFn = unsafe extern "C" fn(file_path: *const c_char) -> *mut c_c
 /// Function Type for writing a file.
 pub type WriteFileFn = unsafe extern "C" fn(file_path: *const c_char, contents: *const c_char);
 /// Function Type for reading a Dir.
-pub type ReadDirFn = unsafe extern "C" fn(dir_path: *const c_char) -> DirHandle;
+pub type ReadDirFn = unsafe extern "C" fn(dir_path: *const c_char) -> pxs_DirHandle;
 
 /// This is the PixelScript state.
 pub(crate) struct PixelState {
@@ -194,7 +198,7 @@ pub trait PixelScript {
     fn stop();
 
     /// Add a global module to the runtime.
-    fn add_module(source: Arc<module::Module>);
+    fn add_module(source: Arc<module::pxs_Module>);
     /// Execute a script in this runtime.
     fn execute(code: &str, file_name: &str) -> String;
     /// Allows the language to start a new thread. In this new thread all callbacks/objects/variables will be empty.
@@ -224,8 +228,8 @@ impl PixelScriptRuntime {
         }
     }
 
-    pub unsafe fn from_var_ptr(var: *mut Var) -> Option<Self> {
-        let borrow = unsafe { Var::from_borrow(var) };
+    pub unsafe fn from_var_ptr(var: *mut pxs_Var) -> Option<Self> {
+        let borrow = unsafe { pxs_Var::from_borrow(var) };
         let int_val = borrow.get_i64();
         if let Ok(int_val) = int_val {
             Self::from_i64(int_val)

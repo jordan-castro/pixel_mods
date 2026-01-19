@@ -112,7 +112,7 @@ fn setup_module_loader(lua: &Lua) {
 pub struct LuaScripting;
 
 impl PixelScript for LuaScripting {
-    fn add_module(source: std::sync::Arc<crate::shared::module::Module>) {
+    fn add_module(source: std::sync::Arc<crate::shared::module::pxs_Module>) {
         module::add_module(source, None);
     }
 
@@ -145,10 +145,10 @@ impl PixelScript for LuaScripting {
 
 impl ObjectMethods for LuaScripting {
     fn object_call(
-        var: &crate::shared::var::Var,
+        var: &crate::shared::var::pxs_Var,
         method: &str,
-        args: &Vec<&mut crate::shared::var::Var>,
-    ) -> Result<crate::shared::var::Var, anyhow::Error> {
+        args: &Vec<&mut crate::shared::var::pxs_Var>,
+    ) -> Result<crate::shared::var::pxs_Var, anyhow::Error> {
         // Get the lua table.
         let table = unsafe {
             if var.is_host_object() {
@@ -185,7 +185,7 @@ impl ObjectMethods for LuaScripting {
         // Drop state
     }
     
-    fn call_method(method: &str, args: &Vec<&mut crate::shared::var::Var>) -> Result<crate::shared::var::Var, anyhow::Error> {
+    fn call_method(method: &str, args: &Vec<&mut crate::shared::var::pxs_Var>) -> Result<crate::shared::var::pxs_Var, anyhow::Error> {
         // Get args as lua args
         let mut lua_args = vec![];
         let state = get_lua_state();

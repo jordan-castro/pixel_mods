@@ -8,7 +8,7 @@
 //
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet}
+    collections::{HashMap, HashSet},
 };
 
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
@@ -20,10 +20,7 @@ use crate::{
         module::create_module,
         var::{pocketpyref_to_var, var_to_pocketpyref},
     },
-    shared::{
-        PixelScript, read_file, read_file_dir,
-        var::ObjectMethods,
-    },
+    shared::{PixelScript, read_file, read_file_dir, var::{ObjectMethods, pxs_Var}},
 };
 
 // Allow for the binidngs only
@@ -56,7 +53,12 @@ struct State {
 }
 
 pub(self) fn exec_py(code: &str, name: &str, module: &str) -> String {
-    run_py(code, name, pocketpy::py_CompileMode::EXEC_MODE, Some(module))
+    run_py(
+        code,
+        name,
+        pocketpy::py_CompileMode::EXEC_MODE,
+        Some(module),
+    )
 }
 
 fn run_py(
@@ -263,7 +265,7 @@ impl PixelScript for PythonScripting {
         }
     }
 
-    fn add_module(source: std::sync::Arc<crate::shared::module::Module>) {
+    fn add_module(source: std::sync::Arc<crate::shared::module::pxs_Module>) {
         create_module(&source, None);
     }
 
@@ -295,10 +297,10 @@ impl PixelScript for PythonScripting {
 
 impl ObjectMethods for PythonScripting {
     fn object_call(
-        var: &crate::shared::var::Var,
+        var: &crate::shared::var::pxs_Var,
         method: &str,
-        args: &Vec<&mut crate::shared::var::Var>,
-    ) -> Result<crate::shared::var::Var, anyhow::Error> {
+        args: &Vec<&mut crate::shared::var::pxs_Var>,
+    ) -> Result<crate::shared::var::pxs_Var, anyhow::Error> {
         // Get the object ref
         let obj_ref = unsafe { pocketpy::py_getreg(0) };
         var_to_pocketpyref(obj_ref, var);
@@ -317,7 +319,7 @@ impl ObjectMethods for PythonScripting {
 
             // Convert args into py_Ref
             for i in 0..args.len() {
-                let pyref = pocketpy::py_getreg((i + 1)  as i32);
+                let pyref = pocketpy::py_getreg((i + 1) as i32);
                 var_to_pocketpyref(pyref, &args[i]);
                 pocketpy::py_push(pyref);
             }
@@ -331,12 +333,33 @@ impl ObjectMethods for PythonScripting {
         Ok(pocketpyref_to_var(result))
     }
 
-    fn call_method(method: &str, args: &Vec<&mut crate::shared::var::Var>) -> Result<crate::shared::var::Var, anyhow::Error> {
+    fn call_method(
+        method: &str,
+        args: &Vec<&mut crate::shared::var::pxs_Var>,
+    ) -> Result<crate::shared::var::pxs_Var, anyhow::Error> {
         // Convert methods to pocketpy
         let method_name = create_raw_string!(method);
         unsafe {
             let pymethod_name = pocketpy::py_name(method_name);
-            let pymethod = pocketpy::py_getglobal(pymethod_name);
+            let pymethod = {
+                // Try a builtin first
+                let global = pocketpy::py_getbuiltin(pymethod_name);
+                if !global.is_null() {
+                    global
+                } else {
+                    // Then look for a method in current module
+                    let found = pocketpy::py_getattr(pocketpy::py_inspect_currentmodule(), pymethod_name);
+                    if !found {
+                        std::ptr::null_mut()
+                    } else {
+                        pocketpy::py_retval()
+                    }
+                }
+            };
+            
+            if pymethod.is_null() {
+                return Ok(pxs_Var::new_null());
+            }
 
             for i in 0..args.len() {
                 let tmp_reg = pocketpy::py_getreg(0);
@@ -344,12 +367,19 @@ impl ObjectMethods for PythonScripting {
                 pocketpy::py_push(tmp_reg);
             }
 
+            // get argv
+            let argv_ptr = pocketpy::py_peek(- (args.len() as i32));
+
             // Call
-            pocketpy::py_call(pymethod, args.len() as i32, std::ptr::null_mut());
+            pocketpy::py_call(pymethod, args.len() as i32, argv_ptr);
 
             free_raw_string!(method_name);
 
             let result = pocketpy::py_retval();
+
+            // Pop the stack
+            pocketpy::py_pop();
+
             Ok(pocketpyref_to_var(result))
         }
     }

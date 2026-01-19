@@ -6,12 +6,14 @@
 //
 // Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 //
-use std::{collections::HashMap, os::raw::c_void, ptr, sync::{Arc, Mutex, OnceLock}};
-
-use crate::shared::{
-    PtrMagic,
-    module::ModuleCallback,
+use std::{
+    collections::HashMap,
+    os::raw::c_void,
+    ptr,
+    sync::{Arc, Mutex, OnceLock},
 };
+
+use crate::shared::{PtrMagic, module::ModuleCallback};
 
 pub type FreeMethod = unsafe extern "C" fn(ptr: *mut c_void);
 
@@ -71,15 +73,16 @@ pub type FreeMethod = unsafe extern "C" fn(ptr: *mut c_void);
 /// // Or functional
 /// pixelscript_add_callback("new_person", new_person);
 /// ```
-/// 
+///
 /// In a JS example:
 /// ```js
 /// let p = new Person("Jordan");
-/// p.set_name("James"); 
+/// p.set_name("James");
 /// ```
 ///
 /// This is why a Objects are more like Pseudo types than actual class/objects.
-pub struct PixelObject {
+#[allow(non_camel_case_types)]
+pub struct pxs_PixelObject {
     /// Type name (this is a hash)
     pub type_name: String,
     /// The Host pointer
@@ -99,7 +102,7 @@ pub struct PixelObject {
     // PixelObject does not hold variables. They are all getters/setters
 }
 
-impl PixelObject {
+impl pxs_PixelObject {
     pub fn new(ptr: *mut c_void, free_method: FreeMethod, type_name: &str) -> Self {
         Self {
             ptr,
@@ -115,7 +118,7 @@ impl PixelObject {
         self.callbacks.push(ModuleCallback {
             name: name.to_string(),
             full_name: full_name.to_string(),
-            idx
+            idx,
         });
     }
 
@@ -137,10 +140,10 @@ impl PixelObject {
     }
 }
 
-impl PtrMagic for PixelObject {}
-unsafe impl Send for PixelObject {}
-unsafe impl Sync for PixelObject {}
-impl Drop for PixelObject {
+impl PtrMagic for pxs_PixelObject {}
+unsafe impl Send for pxs_PixelObject {}
+unsafe impl Sync for pxs_PixelObject {}
+impl Drop for pxs_PixelObject {
     fn drop(&mut self) {
         let mut lang_ptr = self.lang_ptr.lock().unwrap();
         if *self.free_lang_ptr.lock().unwrap() {
@@ -157,13 +160,12 @@ impl Drop for PixelObject {
     }
 }
 
-
 /// Lookup state structure
 pub struct ObjectLookup {
     /// Object hash shared between all runtimes.
-    /// 
+    ///
     /// Negative numbers are valid here.
-    pub object_hash: HashMap<i32, Arc<PixelObject>>
+    pub object_hash: HashMap<i32, Arc<pxs_PixelObject>>,
 }
 
 /// The object lookup!
@@ -171,13 +173,14 @@ static OBJECT_LOOKUP: OnceLock<Mutex<ObjectLookup>> = OnceLock::new();
 
 /// Get the Object lookup global state. Shared between all runtimes.
 fn get_object_lookup() -> std::sync::MutexGuard<'static, ObjectLookup> {
-    OBJECT_LOOKUP.get_or_init(|| {
-        Mutex::new(ObjectLookup {
-            object_hash: HashMap::new(),
+    OBJECT_LOOKUP
+        .get_or_init(|| {
+            Mutex::new(ObjectLookup {
+                object_hash: HashMap::new(),
+            })
         })
-    })
-    .lock()
-    .unwrap()
+        .lock()
+        .unwrap()
 }
 
 pub(crate) fn clear_object_lookup() {
@@ -186,18 +189,20 @@ pub(crate) fn clear_object_lookup() {
 }
 
 // add_object(Arc::clone(&pixel_arc))
-pub(crate) fn lookup_add_object(pixel_obj: Arc<PixelObject>) -> i32 {
+pub(crate) fn lookup_add_object(pixel_obj: Arc<pxs_PixelObject>) -> i32 {
     let mut lookup = get_object_lookup();
 
     let idx = lookup.object_hash.len();
 
-    lookup.object_hash.insert(idx as i32, Arc::clone(&pixel_obj));
+    lookup
+        .object_hash
+        .insert(idx as i32, Arc::clone(&pixel_obj));
 
     idx as i32
 }
 
 /// Get a PixelObject Arc
-pub(crate) fn get_object(idx: i32) -> Option<Arc<PixelObject>> {
+pub(crate) fn get_object(idx: i32) -> Option<Arc<pxs_PixelObject>> {
     let lookup = get_object_lookup();
 
     if let Some(res) = lookup.object_hash.get(&idx) {

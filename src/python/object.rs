@@ -14,7 +14,7 @@ use crate::{
         add_new_defined_object, add_new_name_idx_fn, eval_py, exec_py, is_object_defined,
         make_private, pocketpy, pocketpy_bridge,
     },
-    shared::object::PixelObject,
+    shared::object::pxs_PixelObject,
 };
 
 fn save_object_function(name: &str, idx: i32, module_name: &str) {
@@ -49,7 +49,7 @@ def {name}(*args):
 ///
 /// idx: is the saved object.
 /// source: is the object methods
-pub(super) fn create_object(idx: i32, source: Arc<PixelObject>, module_name: &str) {
+pub(super) fn create_object(idx: i32, source: Arc<pxs_PixelObject>, module_name: &str) {
     // Check if object is defined.
     let obj_exists = is_object_defined(&source.type_name);
     if obj_exists {

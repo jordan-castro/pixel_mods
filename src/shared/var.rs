@@ -127,7 +127,8 @@ pub union VarValue {
 /// 
 /// When creating a object, this is a bit tricky but essentially you have to first create a pointer via the pixel script runtime.
 #[repr(C)]
-pub struct Var {
+#[allow(non_camel_case_types)]
+pub struct pxs_Var {
     /// A tag for the variable type.
     pub tag: VarType,
     /// A value as a union.
@@ -135,8 +136,8 @@ pub struct Var {
 }
 
 // Rust specific functions
-impl Var {
-    pub unsafe fn slice_raw(argv: *mut *mut Self, argc: usize) -> &'static [*mut Var] {
+impl pxs_Var {
+    pub unsafe fn slice_raw(argv: *mut *mut Self, argc: usize) -> &'static [*mut pxs_Var] {
         unsafe {std::slice::from_raw_parts(argv, argc)}
     }
 
@@ -174,7 +175,7 @@ impl Var {
     pub fn new_string(val: String) -> Self {
         let cstr = CString::new(val).expect("Could not create CString.");
 
-        Var {
+        pxs_Var {
             tag: VarType::String,
             value: VarValue {
                 string_val: cstr.into_raw(),
@@ -186,7 +187,7 @@ impl Var {
     ///
     /// No need to free, or any of that. It cretes a *const c_void
     pub fn new_null() -> Self {
-        Var {
+        pxs_Var {
             tag: VarType::Null,
             value: VarValue {
                 null_val: ptr::null(),
@@ -196,7 +197,7 @@ impl Var {
 
     /// Create a new HostObject var.
     pub fn new_host_object(ptr: i32) -> Self {
-        Var {
+        pxs_Var {
             tag: VarType::HostObject,
             value: VarValue { 
                 host_object_val: ptr 
@@ -206,7 +207,7 @@ impl Var {
 
     /// Create a new Object var.
     pub fn new_object(ptr: *mut c_void) -> Self {
-        Var {
+        pxs_Var {
             tag: VarType::Object,
             value: VarValue {
                 object_val: ptr
@@ -236,7 +237,7 @@ impl Var {
     }
 
     /// Free a pointer array of Vars
-    pub unsafe fn free_pointer_array(argv: *mut *mut Var, argc: usize) {
+    pub unsafe fn free_pointer_array(argv: *mut *mut pxs_Var, argc: usize) {
         if argv.is_null() {
             return;
         }
@@ -368,7 +369,7 @@ impl Var {
     }
 }
 
-impl Drop for Var {
+impl Drop for pxs_Var {
     fn drop(&mut self) {
         if self.tag == VarType::String {
             unsafe {
@@ -382,30 +383,30 @@ impl Drop for Var {
     }
 }
 
-impl PtrMagic for Var {}
+impl PtrMagic for pxs_Var {}
 
-impl Clone for Var {
+impl Clone for pxs_Var {
     fn clone(&self) -> Self {
         unsafe {
             match self.tag {
-                VarType::Int64 => Var::new_i64(self.value.i64_val),
-                VarType::UInt64 => Var::new_u64(self.value.u64_val),
-                VarType::String => Var {
+                VarType::Int64 => pxs_Var::new_i64(self.value.i64_val),
+                VarType::UInt64 => pxs_Var::new_u64(self.value.u64_val),
+                VarType::String => pxs_Var {
                     tag: VarType::String,
                     value: VarValue {
                         string_val: self.value.string_val,
                     },
                 },
-                VarType::Bool => Var::new_bool(self.value.bool_val),
-                VarType::Float64 => Var::new_f64(self.value.f64_val),
-                VarType::Null => Var::new_null(),
-                VarType::Object => Var {
+                VarType::Bool => pxs_Var::new_bool(self.value.bool_val),
+                VarType::Float64 => pxs_Var::new_f64(self.value.f64_val),
+                VarType::Null => pxs_Var::new_null(),
+                VarType::Object => pxs_Var {
                     tag: VarType::Object,
                     value: VarValue {
                         object_val: self.value.object_val,
                     },
                 },
-                VarType::HostObject => Var::new_host_object(self.value.host_object_val)
+                VarType::HostObject => pxs_Var::new_host_object(self.value.host_object_val)
             }
         }
     }
@@ -413,8 +414,8 @@ impl Clone for Var {
 
 pub trait ObjectMethods {
     /// Call a method on a object.
-    fn object_call(var: &Var, method: &str, args: &Vec<&mut Var>) -> Result<Var, Error>;
+    fn object_call(var: &pxs_Var, method: &str, args: &Vec<&mut pxs_Var>) -> Result<pxs_Var, Error>;
 
     /// Call a method and pass in args
-    fn call_method(method: &str, args: &Vec<&mut Var>) -> Result<Var, Error>;
+    fn call_method(method: &str, args: &Vec<&mut pxs_Var>) -> Result<pxs_Var, Error>;
 }

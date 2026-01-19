@@ -15,7 +15,10 @@ mod tests {
     };
 
     use pixelscript::{
-        lua::LuaScripting, python::PythonScripting, shared::{DirHandle, PixelScript, PixelScriptRuntime, PtrMagic, var::Var}, *
+        lua::LuaScripting,
+        python::PythonScripting,
+        shared::{PixelScript, PixelScriptRuntime, PtrMagic, pxs_DirHandle, var::pxs_Var},
+        *,
     };
 
     /// Create a raw string from &str.
@@ -60,51 +63,51 @@ mod tests {
         let _ = unsafe { Person::from_borrow(ptr as *mut Person) };
     }
 
-    pub extern "C" fn set_name(argc: usize, argv: *mut *mut Var, _opaque: *mut c_void) -> *mut Var {
+    pub extern "C" fn set_name(argc: usize, argv: *mut *mut pxs_Var, _opaque: *mut c_void) -> *mut pxs_Var {
         unsafe {
-            let args = Var::slice_raw(argv, argc);
+            let args = pxs_Var::slice_raw(argv, argc);
             // Get ptr
-            let pixel_object_var = Var::from_borrow(args[1]);
+            let pixel_object_var = pxs_Var::from_borrow(args[1]);
             let host_ptr = pixel_object_var.get_host_ptr();
             let p = Person::from_borrow(host_ptr as *mut Person);
 
             // Check if first arg is self or nme
             let name = {
-                let first_arg = Var::from_borrow(args[2]);
+                let first_arg = pxs_Var::from_borrow(args[2]);
                 if first_arg.is_string() {
                     first_arg
                 } else {
-                    Var::from_borrow(args[3])
+                    pxs_Var::from_borrow(args[3])
                 }
             };
 
             p.set_name(name.get_string().unwrap().clone());
 
-            Var::into_raw(Var::new_null())
+            pxs_Var::into_raw(pxs_Var::new_null())
         }
     }
 
-    pub extern "C" fn get_name(argc: usize, argv: *mut *mut Var, _opaque: *mut c_void) -> *mut Var {
+    pub extern "C" fn get_name(argc: usize, argv: *mut *mut pxs_Var, _opaque: *mut c_void) -> *mut pxs_Var {
         unsafe {
-            let args = Var::slice_raw(argv, argc);
+            let args = pxs_Var::slice_raw(argv, argc);
 
             // Get ptr
-            let pixel_object_var = Var::from_borrow(args[1]);
+            let pixel_object_var = pxs_Var::from_borrow(args[1]);
             let host_ptr = pixel_object_var.get_host_ptr();
             let p = Person::from_borrow(host_ptr as *mut Person);
 
-            Var::new_string(p.get_name().clone()).into_raw()
+            pxs_Var::new_string(p.get_name().clone()).into_raw()
         }
     }
 
     pub extern "C" fn new_person(
         argc: usize,
-        argv: *mut *mut Var,
+        argv: *mut *mut pxs_Var,
         opaque: *mut c_void,
-    ) -> *mut Var {
+    ) -> *mut pxs_Var {
         unsafe {
             let args = std::slice::from_raw_parts(argv, argc);
-            let p_name = Var::from_borrow(args[1]);
+            let p_name = pxs_Var::from_borrow(args[1]);
             let p_name = p_name.get_string().unwrap();
             let p = Person::new(p_name.clone());
             let typename = create_raw_string!("Person");
@@ -128,9 +131,9 @@ mod tests {
     // Testing callbacks
     pub extern "C" fn print_wrapper(
         argc: usize,
-        argv: *mut *mut Var,
+        argv: *mut *mut pxs_Var,
         _opaque: *mut c_void,
-    ) -> *mut Var {
+    ) -> *mut pxs_Var {
         unsafe {
             let args = std::slice::from_raw_parts(argv, argc);
 
@@ -148,38 +151,38 @@ mod tests {
             println!("From Runtime: {string}");
         }
 
-        Var::new_null().into_raw()
+        pxs_Var::new_null().into_raw()
     }
 
     pub extern "C" fn add_wrapper(
         argc: usize,
-        argv: *mut *mut Var,
+        argv: *mut *mut pxs_Var,
         _opaque: *mut c_void,
-    ) -> *mut Var {
+    ) -> *mut pxs_Var {
         // Assumes n1 and n2
         unsafe {
             let args = std::slice::from_raw_parts(argv, argc);
 
-            let n1 = Var::from_borrow(args[1]);
-            let n2 = Var::from_borrow(args[2]);
+            let n1 = pxs_Var::from_borrow(args[1]);
+            let n2 = pxs_Var::from_borrow(args[2]);
 
-            Var::new_i64(n1.value.i64_val + n2.value.i64_val).into_raw()
+            pxs_Var::new_i64(n1.value.i64_val + n2.value.i64_val).into_raw()
         }
     }
 
     pub extern "C" fn sub_wrapper(
         argc: usize,
-        argv: *mut *mut Var,
+        argv: *mut *mut pxs_Var,
         _opaque: *mut c_void,
-    ) -> *mut Var {
+    ) -> *mut pxs_Var {
         // Assumes n1 and n2
         unsafe {
             let args = std::slice::from_raw_parts(argv, argc);
 
-            let n1 = Var::from_borrow(args[1]);
-            let n2 = Var::from_borrow(args[2]);
+            let n1 = pxs_Var::from_borrow(args[1]);
+            let n2 = pxs_Var::from_borrow(args[2]);
 
-            Var::new_i64(n1.value.i64_val - n2.value.i64_val).into_raw()
+            pxs_Var::new_i64(n1.value.i64_val - n2.value.i64_val).into_raw()
         }
     }
 
@@ -203,20 +206,20 @@ mod tests {
         create_raw_string!(contents)
     }
 
-    unsafe extern "C" fn dir_reader(dir_path: *const c_char) -> DirHandle {
+    unsafe extern "C" fn dir_reader(dir_path: *const c_char) -> pxs_DirHandle {
         let dir_path = unsafe { CStr::from_ptr(dir_path).to_str().unwrap() };
 
         if dir_path.is_empty() {
-            return DirHandle::empty();
+            return pxs_DirHandle::empty();
         }
 
         // Check if dir exists
         let dir_exists = std::fs::exists(dir_path).unwrap();
         if !dir_exists {
-            return DirHandle::empty();
+            return pxs_DirHandle::empty();
         }
 
-        // Load dir 
+        // Load dir
         let files = std::fs::read_dir(dir_path).unwrap();
         let mut result = vec![];
 
@@ -226,17 +229,20 @@ mod tests {
         }
 
         // 1. Convert Strings to CStrings, then to raw pointers
-    // We use .into_raw() so Rust surrenders ownership and doesn't free the memory
-    let mut c_ptrs: Vec<*mut c_char> = result
-        .into_iter()
-        .map(|s| CString::new(s).unwrap().into_raw())
-        .collect();
+        // We use .into_raw() so Rust surrenders ownership and doesn't free the memory
+        let mut c_ptrs: Vec<*mut c_char> = result
+            .into_iter()
+            .map(|s| CString::new(s).unwrap().into_raw())
+            .collect();
 
-    // 2. Get a pointer to the array of pointers
-    // We get the pointer to the underlying buffer of the Vec
-    let argv: *mut *mut c_char = c_ptrs.as_mut_ptr();
-    let argc = c_ptrs.len();
-        DirHandle { length: argc, values: argv }
+        // 2. Get a pointer to the array of pointers
+        // We get the pointer to the underlying buffer of the Vec
+        let argv: *mut *mut c_char = c_ptrs.as_mut_ptr();
+        let argc = c_ptrs.len();
+        pxs_DirHandle {
+            length: argc,
+            values: argv,
+        }
     }
 
     // // #[test]
@@ -281,7 +287,7 @@ mod tests {
         let name = create_raw_string!("print");
         pixelscript_add_callback(module, name, print_wrapper, ptr::null_mut());
         let var_name = create_raw_string!("name");
-        let jordan = create_raw_string!("Jordan");
+        let jordan = create_raw_string!("Jordan C");
         let var = pixelscript_var_newstring(jordan);
         pixelscript_add_variable(module, var_name, var);
 
@@ -349,7 +355,9 @@ mod tests {
                 let full_lines = lines.join("\n");
                 let err = match runtime {
                     PixelScriptRuntime::Lua => LuaScripting::execute(&full_lines, "<test_repl>"),
-                    PixelScriptRuntime::Python => PythonScripting::execute(&full_lines, "<test_repl>"),
+                    PixelScriptRuntime::Python => {
+                        PythonScripting::execute(&full_lines, "<test_repl>")
+                    }
                     PixelScriptRuntime::JavaScript => todo!(),
                     PixelScriptRuntime::Easyjs => todo!(),
                 };

@@ -9,16 +9,16 @@
 use mlua::prelude::*;
 // use mlua::{Integer, IntoLua, Lua, MultiValue, Value::Nil, Variadic};
 
-use crate::{lua::{from_lua, into_lua}, shared::{PixelScriptRuntime, func::call_function, var::Var}};
+use crate::{lua::{from_lua, into_lua}, shared::{PixelScriptRuntime, func::call_function, var::pxs_Var}};
 
 /// For internal use since modules also need to use the same logic for adding a Lua callback.
 pub(super) fn internal_add_callback(lua: &Lua, fn_idx: i32) -> LuaFunction {
     lua.create_function(move |lua, args: LuaMultiValue| {
         // Convert args -> argv for pixelmods
-        let mut argv: Vec<Var> = vec![];
+        let mut argv: Vec<pxs_Var> = vec![];
 
         // Pass in the runtime type
-        argv.push(Var::new_i64(PixelScriptRuntime::Lua as i64));
+        argv.push(pxs_Var::new_i64(PixelScriptRuntime::Lua as i64));
 
         // Objects are handled a little differently know. It's kinda repeated code but oh well.
         // // If a obj is passed

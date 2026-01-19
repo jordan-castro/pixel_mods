@@ -8,36 +8,36 @@
 //
 use std::{ffi::c_void, sync::Arc};
 
-use crate::{borrow_string, create_raw_string, free_raw_string, python::{func::py_assign, object::create_object, pocketpy::{self, py_getreg}}, shared::{object::get_object, var::{Var, VarType}}};
+use crate::{borrow_string, create_raw_string, free_raw_string, python::{func::py_assign, object::create_object, pocketpy::{self, py_getreg}}, shared::{object::get_object, var::{pxs_Var, VarType}}};
 
 /// Convert a PocketPy ref into a Var
-pub(super) fn pocketpyref_to_var(pref: pocketpy::py_Ref) -> Var {
+pub(super) fn pocketpyref_to_var(pref: pocketpy::py_Ref) -> pxs_Var {
     let tp = unsafe { pocketpy::py_typeof(pref) } as i32;
     // let tp_enum = pocketpy::py_PredefinedType::from(tp);
     if tp == pocketpy::py_PredefinedType::tp_int as i32 {
         let val = unsafe { pocketpy::py_toint(pref) };
-        Var::new_i64(val)
+        pxs_Var::new_i64(val)
     } else if tp == pocketpy::py_PredefinedType::tp_float as i32 {
         let val = unsafe { pocketpy::py_tofloat(pref) };
-        Var::new_f64(val)
+        pxs_Var::new_f64(val)
     } else if tp == pocketpy::py_PredefinedType::tp_bool as i32 {
         let val = unsafe { pocketpy::py_tobool(pref) };
-        Var::new_bool(val)
+        pxs_Var::new_bool(val)
     }  else if tp == pocketpy::py_PredefinedType::tp_str as i32 {
         let cstr_ptr = unsafe { pocketpy::py_tostr(pref) };
         let r_str = borrow_string!(cstr_ptr).to_string();
 
-        Var::new_string(r_str)
+        pxs_Var::new_string(r_str)
     } else if tp == pocketpy::py_PredefinedType::tp_NoneType as i32 {
-        Var::new_null()
+        pxs_Var::new_null()
     }
     else {
-        Var::new_object(pref as *mut c_void)
+        pxs_Var::new_object(pref as *mut c_void)
     }
 }
 
 /// Convert a Var into a PocketPy ref
-pub(super) fn var_to_pocketpyref(out: pocketpy::py_Ref, var: &Var) {
+pub(super) fn var_to_pocketpyref(out: pocketpy::py_Ref, var: &pxs_Var) {
     unsafe {
         match var.tag {
             VarType::Int64 => {

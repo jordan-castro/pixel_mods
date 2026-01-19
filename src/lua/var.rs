@@ -14,29 +14,29 @@ use mlua::prelude::*;
 // Pure Rust goes here
 use crate::{
     lua::object::create_object, shared::{
-        object::get_object, var::{Var, VarType}
+        object::get_object, var::{pxs_Var, VarType}
     }
 };
 
 /// Convert a Lua value to a Var.
-pub(super) fn from_lua(value: LuaValue) -> Result<Var, anyhow::Error> {
+pub(super) fn from_lua(value: LuaValue) -> Result<pxs_Var, anyhow::Error> {
     match value {
-        LuaValue::Boolean(b) => Ok(Var::new_bool(b)),
-        LuaValue::Integer(i) => Ok(Var::new_i64(i)),
-        LuaValue::Number(n) => Ok(Var::new_f64(n)),
-        LuaValue::String(s) => Ok(Var::new_string(s.to_string_lossy())),
+        LuaValue::Boolean(b) => Ok(pxs_Var::new_bool(b)),
+        LuaValue::Integer(i) => Ok(pxs_Var::new_i64(i)),
+        LuaValue::Number(n) => Ok(pxs_Var::new_f64(n)),
+        LuaValue::String(s) => Ok(pxs_Var::new_string(s.to_string_lossy())),
         LuaValue::Table(t) => {
             let obj = Box::into_raw(Box::new(t));
-            Ok(Var::new_object(obj as *mut c_void))
+            Ok(pxs_Var::new_object(obj as *mut c_void))
         },
         _ => {
-            Ok(Var::new_null())
+            Ok(pxs_Var::new_null())
         }
     }
 }
 
 /// Convert a Var into a LuaValue
-pub(super) fn into_lua(lua: &Lua, var: &Var) -> LuaResult<LuaValue> {
+pub(super) fn into_lua(lua: &Lua, var: &pxs_Var) -> LuaResult<LuaValue> {
     match var.tag {
             VarType::Int64 => Ok(mlua::Value::Integer(var.get_i64().unwrap())),
             VarType::UInt64 => Ok(mlua::Value::Integer(var.get_u64().unwrap() as i64)),
