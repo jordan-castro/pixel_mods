@@ -314,23 +314,31 @@ impl ObjectMethods for PythonScripting {
             let pymethod = pocketpy::py_retval();
             free_raw_string!(method_name);
 
+            // Push method
+            pocketpy::py_push(pymethod);
             // Push self
             pocketpy::py_push(obj_ref);
 
             // Convert args into py_Ref
             for i in 0..args.len() {
-                let pyref = pocketpy::py_getreg((i + 1) as i32);
+                let pyref = pocketpy::py_pushtmp();
                 var_to_pocketpyref(pyref, &args[i]);
-                pocketpy::py_push(pyref);
             }
 
             // Now call
-            pocketpy::py_call(pymethod, (args.len() + 1) as i32, std::ptr::null_mut());
+            // Result is py_retval
+            // Call it via vectrocall
+            let ok = pocketpy::py_vectorcall(args.len() as u16, 0);
+            if !ok {
+                return Ok(pxs_Var::new_null());
+            }
+
+            let result_ref = pocketpy::py_retval();
+            let final_var = pocketpyref_to_var(result_ref);
+            
+            Ok(final_var)
         }
 
-        // Result is py_retval
-        let result = unsafe { pocketpy::py_retval() };
-        Ok(pocketpyref_to_var(result))
     }
 
     fn call_method(
@@ -370,10 +378,7 @@ impl ObjectMethods for PythonScripting {
             for i in 0..args.len() {
                 let tmp_reg = pocketpy::py_pushtmp();
                 var_to_pocketpyref(tmp_reg, &args[i]);
-                println!("Var type is: {:#?}", args[i].tag);
-                println!("Pocketpy Var type is: {:#?}", pocketpy::py_typeof(tmp_reg));
             }
-            println!("Got here.");
 
             // Call it via vectrocall
             let ok = pocketpy::py_vectorcall(args.len() as u16, 0);

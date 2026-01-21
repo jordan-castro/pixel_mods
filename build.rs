@@ -54,6 +54,7 @@ fn build_pocketpy() {
 fn build_pocketpy_bindings() {
     let bindings = bindgen::Builder::default()
         .header("libs/pocketpy/pocketpy.h")
+        .clang_arg("-DPK_IS_PUBLIC_INCLUDE")
         .clang_arg("-Ilibs/pocketpy")
         .default_enum_style(bindgen::EnumVariation::Rust { non_exhaustive: false })
         .size_t_is_usize(true)

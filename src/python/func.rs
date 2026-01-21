@@ -14,21 +14,17 @@ use crate::{
     shared::{PixelScriptRuntime, func::call_function, var::pxs_Var},
 };
 
-/// The size of the pyType thingy. This is the same for all modes and platforms.
-/// According to bluelove
-const PY_TYPE_SIZE: usize = 24;
-
 /// Use instead of the py_arg macro.
 pub(super) unsafe fn py_get_arg(argv: pocketpy::py_StackRef, i: usize) -> pocketpy::py_StackRef {
-    let base_addr = argv as *mut u8;
-    let offset_addr = unsafe { base_addr.add(i * PY_TYPE_SIZE) };
-    offset_addr as pocketpy::py_StackRef
+    unsafe {
+        argv.add(i)
+    }
 }
 
 /// Use instead of the py_assign macro.
 pub(super) unsafe fn py_assign(left: pocketpy::py_Ref, right: pocketpy::py_Ref) {
     unsafe {
-        std::ptr::copy_nonoverlapping(right, left, 1);
+        *left = *right;
     }
 }
 

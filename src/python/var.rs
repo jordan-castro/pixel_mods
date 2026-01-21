@@ -68,9 +68,7 @@ pub(super) fn var_to_pocketpyref(out: pocketpy::py_Ref, var: &pxs_Var) {
                 } else {
                     // This is a Python object that already exists, just that it's pointer was passed around.
                     let ptr = var.value.object_val as pocketpy::py_Ref;
-                    println!("ptr Type: {:#?}", pocketpy::py_typeof(ptr));
                     py_assign(out, ptr);
-                    println!("out Type: {:#?}", pocketpy::py_typeof(out));
                     // UNSAFE UNSAFE UNSAFE UNSAFE!!!!
                 }
             },
@@ -89,7 +87,7 @@ pub(super) fn var_to_pocketpyref(out: pocketpy::py_Ref, var: &pxs_Var) {
                     let r0 = py_getreg(0);
                     let module_name = pocketpy::py_tostr(r0);
                     let module_name = borrow_string!(module_name);
-                    // TODO: Create the object for the first time...
+                    // Create the object for the first time...
                     create_object(idx, Arc::clone(&pixel_object), module_name);
                     // Get py_retval
                     let pyobj = pocketpy::py_retval();
