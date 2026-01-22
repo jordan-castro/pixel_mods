@@ -30,7 +30,7 @@
 
 ## Vars
 - add Array type which holds many Vars.
-- Add to_* methods for bool, int, float, and string. These methods might use the Object.call and might require the runtime.
+- Add exceptions
 
 ## STD
 - Add std library via pixelscript runtime. These are optional and handled via features

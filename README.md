@@ -294,7 +294,7 @@ int main() {
 
 ## Future
 This will ideally be used by all future epochtech games since it allows for modding in multiple languages. 
-It's not quite ready to be used in production for anyone other than myself and epochtech. And it is definitely leaking memory. But if you make PRs to fix
+It's not quite ready to be used in production for anyone other than myself and epochtech. But if you make PRs to fix
 something or open issues, I will be responding and merging. Feel free to add a language, just check out /lua or /python for examples on how to use Var, Func, Module, PixelObject, and PixelScripting.
 
 Also RustPython and Luajit do not currently work.

@@ -25,7 +25,7 @@ use crate::shared::{
     get_pixel_state,
     module::pxs_Module,
     object::{FreeMethod, clear_object_lookup, lookup_add_object, pxs_PixelObject},
-    var::{ObjectMethods, VarType},
+    var::{ObjectMethods, pxs_VarType},
 };
 
 pub mod shared;
@@ -96,6 +96,15 @@ macro_rules! assert_initiated {
 static mut IS_INIT: bool = false;
 /// Is killed?
 static mut IS_KILLED: bool = false;
+
+// Type defs
+
+#[allow(non_camel_case_types)]
+pub type pxs_Argc = usize;
+#[allow(non_camel_case_types)]
+pub type pxs_Argv = *mut *mut pxs_Var;
+#[allow(non_camel_case_types)]
+pub type pxs_Opaque = *mut c_void;
 
 /// Current pixelscript version.
 #[unsafe(no_mangle)]
@@ -237,7 +246,7 @@ pub extern "C" fn pixelscript_add_callback(
     module_ptr: *mut pxs_Module,
     name: *const c_char,
     func: pxs_Func,
-    opaque: *mut c_void,
+    opaque: pxs_Opaque,
 ) {
     assert_initiated!();
     if module_ptr.is_null() {
@@ -353,7 +362,7 @@ pub extern "C" fn pixelscript_free_module(module_ptr: *mut pxs_Module) {
 /// This must be wrapped in a `pixelscript_var_object` before use within a callback. If setting to a variable, this is done automatically for you.
 #[unsafe(no_mangle)]
 pub extern "C" fn pixelscript_new_object(
-    ptr: *mut c_void,
+    ptr: pxs_Opaque,
     free_method: FreeMethod,
     type_name: *const c_char,
 ) -> *mut pxs_PixelObject {
@@ -374,7 +383,7 @@ pub extern "C" fn pixelscript_object_add_callback(
     object_ptr: *mut pxs_PixelObject,
     name: *const c_char,
     callback: pxs_Func,
-    opaque: *mut c_void,
+    opaque: pxs_Opaque,
 ) {
     assert_initiated!();
 
@@ -424,19 +433,18 @@ pub extern "C" fn pixelscript_add_object(
     module_ptr: *mut pxs_Module,
     name: *const c_char,
     object_constructor: pxs_Func,
-    opaque: *mut c_void,
+    opaque: pxs_Opaque,
 ) {
     // Save module to object
     pixelscript_add_callback(module_ptr, name, object_constructor, opaque);
 }
 
 /// Make a new Var string.
-///
-/// Does take ownership
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_newstring(str: *mut c_char) -> *mut pxs_Var {
-    let val = own_string!(str);
-    pxs_Var::new_string(val).into_raw()
+pub extern "C" fn pixelscript_var_newstring(str: *const c_char) -> *mut pxs_Var {
+    let val = borrow_string!(str);
+    // Clone string
+    pxs_Var::new_string(val.to_string().clone()).into_raw()
 }
 
 /// Make a new Null var.
@@ -498,8 +506,8 @@ pub extern "C" fn pixelscript_object_call_rt(
     runtime: PixelScriptRuntime,
     var: *mut pxs_Var,
     method: *const c_char,
-    argc: usize,
-    argv: *mut *mut pxs_Var,
+    argc: pxs_Argc,
+    argv: pxs_Argv,
 ) -> *mut pxs_Var {
     pixelscript_object_call(
         pxs_Var::new_i64(runtime as i64).into_raw(),
@@ -527,8 +535,8 @@ pub extern "C" fn pixelscript_object_call(
     runtime: *mut pxs_Var,
     var: *mut pxs_Var,
     method: *const c_char,
-    argc: usize,
-    argv: *mut *mut pxs_Var,
+    argc: pxs_Argc,
+    argv: pxs_Argv,
 ) -> *mut pxs_Var {
     assert_initiated!();
 
@@ -562,10 +570,10 @@ pub extern "C" fn pixelscript_object_call(
 
     // Ensure type
     let tags = vec![
-        VarType::Object,
-        VarType::HostObject,
-        VarType::Int64,
-        VarType::UInt64,
+        pxs_VarType::Object,
+        pxs_VarType::HostObject,
+        pxs_VarType::Int64,
+        pxs_VarType::UInt64,
     ];
     if !tags.contains(&var_borrow.tag) {
         return pxs_Var::new_null().into_raw();
@@ -590,7 +598,7 @@ pub extern "C" fn pixelscript_object_call(
         PixelScriptRuntime::JavaScript => todo!(),
         PixelScriptRuntime::Easyjs => todo!(),
         PixelScriptRuntime::RustPython => todo!(),
-        PixelScriptRuntime::LuaJit => todo!()
+        PixelScriptRuntime::LuaJit => todo!(),
     };
 
     if let Ok(var) = var {
@@ -611,10 +619,10 @@ pub extern "C" fn pixelscript_var_get_int(var: *mut pxs_Var) -> i64 {
 
     unsafe {
         match b_var.tag {
-            VarType::Int64 => b_var.value.i64_val,
-            VarType::UInt64 => b_var.value.u64_val as i64,
-            VarType::Bool => b_var.value.bool_val.into(),
-            VarType::Float64 => b_var.value.f64_val as i64,
+            pxs_VarType::Int64 => b_var.value.i64_val,
+            pxs_VarType::UInt64 => b_var.value.u64_val as i64,
+            pxs_VarType::Bool => b_var.value.bool_val.into(),
+            pxs_VarType::Float64 => b_var.value.f64_val as i64,
             _ => -1,
         }
     }
@@ -631,10 +639,10 @@ pub extern "C" fn pixelscript_var_get_uint(var: *mut pxs_Var) -> u64 {
 
     unsafe {
         match b_var.tag {
-            VarType::Int64 => b_var.value.i64_val as u64,
-            VarType::UInt64 => b_var.value.u64_val,
-            VarType::Bool => b_var.value.bool_val.into(),
-            VarType::Float64 => b_var.value.f64_val as u64,
+            pxs_VarType::Int64 => b_var.value.i64_val as u64,
+            pxs_VarType::UInt64 => b_var.value.u64_val,
+            pxs_VarType::Bool => b_var.value.bool_val.into(),
+            pxs_VarType::Float64 => b_var.value.f64_val as u64,
             _ => 0,
         }
     }
@@ -651,10 +659,10 @@ pub extern "C" fn pixelscript_var_get_float(var: *mut pxs_Var) -> f64 {
 
     unsafe {
         match b_var.tag {
-            VarType::Int64 => b_var.value.i64_val as f64,
-            VarType::UInt64 => b_var.value.u64_val as f64,
-            VarType::Bool => b_var.value.bool_val.into(),
-            VarType::Float64 => b_var.value.f64_val,
+            pxs_VarType::Int64 => b_var.value.i64_val as f64,
+            pxs_VarType::UInt64 => b_var.value.u64_val as f64,
+            pxs_VarType::Bool => b_var.value.bool_val.into(),
+            pxs_VarType::Float64 => b_var.value.f64_val,
             _ => 0 as f64,
         }
     }
@@ -691,7 +699,7 @@ pub extern "C" fn pixelscript_var_get_string(var: *mut pxs_Var) -> *mut c_char {
 ///
 /// This is "potentially" dangerous.
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_get_host_object(var: *mut pxs_Var) -> *mut c_void {
+pub extern "C" fn pixelscript_var_get_host_object(var: *mut pxs_Var) -> pxs_Opaque {
     if var.is_null() {
         return ptr::null_mut();
     }
@@ -711,7 +719,7 @@ pub extern "C" fn pixelscript_var_get_object_idx(var: *mut pxs_Var) -> i32 {
 
 /// Check if a variable is of a type.
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_is(var: *mut pxs_Var, var_type: VarType) -> bool {
+pub extern "C" fn pixelscript_var_is(var: *mut pxs_Var, var_type: pxs_VarType) -> bool {
     if var.is_null() {
         return false;
     }
@@ -809,21 +817,21 @@ pub extern "C" fn pixelscript_var_tostring(
 
     // If string or primative, no object calling needed
     match b_var.tag {
-        VarType::Int64 => {
+        pxs_VarType::Int64 => {
             let val = b_var.get_i64().unwrap();
             return pxs_Var::new_string(val.to_string()).into_raw();
         }
-        VarType::UInt64 => {
+        pxs_VarType::UInt64 => {
             let val = b_var.get_u64().unwrap();
             return pxs_Var::new_string(val.to_string()).into_raw();
         }
-        VarType::String => {
+        pxs_VarType::String => {
             return pxs_Var::new_string(b_var.get_string().unwrap().clone()).into_raw();
         }
-        VarType::Bool => {
+        pxs_VarType::Bool => {
             return pxs_Var::new_string(b_var.get_bool().unwrap().to_string()).into_raw();
         }
-        VarType::Float64 => {
+        pxs_VarType::Float64 => {
             return pxs_Var::new_string(b_var.get_f64().unwrap().to_string()).into_raw();
         }
         _ => {
@@ -857,6 +865,138 @@ pub extern "C" fn pixelscript_var_tostring(
         } else {
             ptr::null_mut()
         }
+    } else {
+        ptr::null_mut()
+    }
+}
+
+/// Call a method within a specifed runtime.
+///
+/// Runtime is a `pxs_Var`
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_call_method(
+    runtime: *mut pxs_Var,
+    method: *const c_char,
+    argc: pxs_Argc,
+    argv: pxs_Argv,
+) -> *mut pxs_Var {
+    assert_initiated!();
+
+    if runtime.is_null() || method.is_null() || argv.is_null() {
+        return ptr::null_mut();
+    }
+
+    // Borrow runtime, var, and method, and argv
+    let runtime_borrow = unsafe { PixelScriptRuntime::from_var_ptr(runtime) };
+    let method_borrow = borrow_string!(method);
+    let argv_borrow: &[*mut pxs_Var] = unsafe { pxs_Var::slice_raw(argv, argc) };
+    let mut owned_args: Vec<pxs_Var> = argv_borrow
+        .iter()
+        .filter(|ptr| !ptr.is_null())
+        .map(|&ptr| unsafe { (*ptr).clone() })
+        .collect();
+    let args: Vec<&mut pxs_Var> = owned_args.iter_mut().collect();
+
+    // Get runtime
+    if let Some(rt) = runtime_borrow {
+        let res = match rt {
+            PixelScriptRuntime::Lua => {
+                with_feature!(
+                    "lua",
+                    { LuaScripting::call_method(method_borrow, &args) },
+                    { Ok(pxs_Var::new_null()) }
+                )
+            }
+            PixelScriptRuntime::Python => {
+                with_feature!(
+                    "python",
+                    { PythonScripting::call_method(method_borrow, &args) },
+                    { Ok(pxs_Var::new_null()) }
+                )
+            }
+            PixelScriptRuntime::JavaScript => todo!(),
+            PixelScriptRuntime::Easyjs => todo!(),
+            PixelScriptRuntime::RustPython => todo!(),
+            PixelScriptRuntime::LuaJit => todo!(),
+        };
+        if let Ok(res) = res {
+            res.into_raw()
+        } else {
+            ptr::null_mut()
+        }
+    } else {
+        ptr::null_mut()
+    }
+}
+
+/// Create a new pxs_VarList.
+/// 
+/// This does not take any arguments. To add to a list, you must call `pixelscript_var_list_add(ptr, item)`
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_var_newlist() -> *mut pxs_Var {
+    assert_initiated!();
+
+    pxs_Var::new_list().into_raw()
+}
+
+/// Add a item to a pxs_VarList.
+/// 
+/// Expects a pointer to pxs_VarList. And a pointer for the item to add (pxs_Var*)
+///
+/// This will take ownership of the added item. If you want to copy it instead first create a new `pxs_Var` with `pixelscript_var_newcopy(item)`
+/// 
+/// Will return the index added at.
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_var_list_add(list: *mut pxs_Var, item: *mut pxs_Var) -> i32 {
+    assert_initiated!();
+
+    // Check null
+    if list.is_null() || item.is_null() {
+        return -1;
+    }
+    
+    // Borrow list
+    let borrow_list = unsafe{pxs_Var::from_borrow(list)};
+    // Check that this is actually a list
+    if !borrow_list.is_list() {
+        return -1;
+    }
+
+    // and own item
+    let owned_item = pxs_Var::from_raw(item);
+
+    // Get varlist and add item
+    let varlist = borrow_list.get_list().unwrap();
+    varlist.add_item(owned_item);
+    
+    // Return index
+    (varlist.vars.len() - 1) as i32
+}
+
+/// Get a item from a pxs_VarList.
+/// 
+/// Expcts a pointer to pxs_VarList. And a index of i32. Supports negative indexes just like in Python.
+/// 
+/// This will return a cloned variable, you must free it once done.
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_var_list_get(list: *mut pxs_Var, index: i32) -> *mut pxs_Var {
+    assert_initiated!();
+
+    if list.is_null() {
+        return ptr::null_mut();
+    }
+
+    // Get list
+    let borrow_list = unsafe{pxs_Var::from_borrow(list)};
+    if !borrow_list.is_list() {
+        return ptr::null_mut();
+    }
+
+    // Derefernce list and get the item.
+    // If found, clone the value so now the caller has it's own seperate memory.
+    let varlist = borrow_list.get_list().unwrap();
+    if let Some(res) = varlist.get_item(index) {
+        res.clone().into_raw()
     } else {
         ptr::null_mut()
     }

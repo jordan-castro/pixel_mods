@@ -8,7 +8,7 @@
 //
 use std::{ffi::c_void, sync::Arc};
 
-use crate::{borrow_string, create_raw_string, free_raw_string, python::{func::py_assign, object::create_object, pocketpy::{self, py_getreg}}, shared::{object::get_object, var::{pxs_Var, VarType}}};
+use crate::{borrow_string, create_raw_string, free_raw_string, python::{func::py_assign, object::create_object, pocketpy::{self, py_getreg}}, shared::{object::get_object, var::{pxs_Var, pxs_VarType}}};
 
 /// Convert a PocketPy ref into a Var
 pub(super) fn pocketpyref_to_var(pref: pocketpy::py_Ref) -> pxs_Var {
@@ -40,29 +40,29 @@ pub(super) fn pocketpyref_to_var(pref: pocketpy::py_Ref) -> pxs_Var {
 pub(super) fn var_to_pocketpyref(out: pocketpy::py_Ref, var: &pxs_Var) {
     unsafe {
         match var.tag {
-            VarType::Int64 => {
+            pxs_VarType::Int64 => {
                 pocketpy::py_newint(out, var.get_i64().unwrap());
             },
-            VarType::UInt64 => {
+            pxs_VarType::UInt64 => {
                 pocketpy::py_newint(out, var.get_u64().unwrap() as i64)
             },
-            VarType::Float64 => {
+            pxs_VarType::Float64 => {
                 pocketpy::py_newfloat(out, var.get_f64().unwrap());
             },
-            crate::shared::var::VarType::Bool => {
+            crate::shared::var::pxs_VarType::Bool => {
                 pocketpy::py_newbool(out, var.get_bool().unwrap());
             },
-            crate::shared::var::VarType::String => {
+            crate::shared::var::pxs_VarType::String => {
                 let s = var.get_string().unwrap();
                 let c_str = create_raw_string!(s);
                 pocketpy::py_newstr(out, c_str);
                 // Free raw string
                 free_raw_string!(c_str);
             },
-            crate::shared::var::VarType::Null => {
+            crate::shared::var::pxs_VarType::Null => {
                 pocketpy::py_newnone(out);
             },
-            crate::shared::var::VarType::Object => {
+            crate::shared::var::pxs_VarType::Object => {
                 if var.value.object_val.is_null() {
                     pocketpy::py_newnone(out);
                 } else {
@@ -72,7 +72,7 @@ pub(super) fn var_to_pocketpyref(out: pocketpy::py_Ref, var: &pxs_Var) {
                     // UNSAFE UNSAFE UNSAFE UNSAFE!!!!
                 }
             },
-            crate::shared::var::VarType::HostObject => {
+            crate::shared::var::pxs_VarType::HostObject => {
                 let idx = var.value.host_object_val;
                 let pixel_object = get_object(idx).unwrap();
                 // DO NOT FREE POCKETPY memory.
