@@ -184,12 +184,12 @@ void destroy_person(Person *p) {
 
 // ========================== C Binding (END) ==========================
 
-Var* ps_set_name(uintptr_t argc, struct Var **argv, void *opaque) {
-    Var* object = argv[1];
-    // Name is either argv[2] or argv[3] due to the "self" variable that gets passed in via Lua.
-    Var* name = argv[3]; // In this example we use LUA, so we will stick to it.
+pxs_Var* ps_set_name(struct pxs_VarList* args, void *opaque) {
+    pxs_Var* runtime = pxs_var_list_get(args, 0);
+    pxs_Var* self = pxs_var_list_get(args, 1);
+    pxs_Var* name - pxs_var_list_get(args, 2);
 
-    Person* p = pxs_var_get_host_object(object);
+    Person* p = pxs_var_get_host_object(self);
     char* new_name = pxs_var_get_string(name);
 
     set_name(p, new_name);
