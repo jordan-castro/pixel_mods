@@ -41,7 +41,7 @@ When including `easyjs` make sure to also include a JavaScript feature otherwise
 To include the PixelScript core API, add the `include-core` feature.
 | Module name | Module purpose | Languages Type | Notes |
 |-------------|----------------|-------------------|-------|
-| `ps_json`   | Adds JSON encoding, decoding, and .* properties. | Lua(Tree), Python(object), JS(Prototype), easyjs(struct) | Requires a loader function. Set via `pixelscript_set_file_reader` and a writer function via `pixelscript_set_file_writer` |
+| `ps_json`   | Adds JSON encoding, decoding, and .* properties. | Lua(Tree), Python(object), JS(Prototype), easyjs(struct) | Requires a loader function. Set via `pxs_set_file_reader` and a writer function via `pxs_set_file_writer` |
 
 <!-- ### Examples
 `ps_json` In lua
@@ -189,30 +189,30 @@ Var* ps_set_name(uintptr_t argc, struct Var **argv, void *opaque) {
     // Name is either argv[2] or argv[3] due to the "self" variable that gets passed in via Lua.
     Var* name = argv[3]; // In this example we use LUA, so we will stick to it.
 
-    Person* p = pixelscript_var_get_host_object(object);
-    char* new_name = pixelscript_var_get_string(name);
+    Person* p = pxs_var_get_host_object(object);
+    char* new_name = pxs_var_get_string(name);
 
     set_name(p, new_name);
 
-    pixelscript_free_str(new_name);
+    pxs_free_str(new_name);
 
-    return pixelscript_var_newnull();
+    return pxs_var_newnull();
 }
 
 Var* ps_get_name(uintptr_t argc, struct Var **argv, void *opaque) {
     Var* object = argv[1];
     
-    Person* p = pixelscript_var_get_host_object(object);
+    Person* p = pxs_var_get_host_object(object);
 
-    return pixelscript_var_newstring(p->name);
+    return pxs_var_newstring(p->name);
 }
 
 Var* ps_get_age(uintptr_t argc, struct Var **argv, void *opaque) { 
     Var* object = argv[1];
 
-    Person* p = pixelscript_var_get_host_object(object);
+    Person* p = pxs_var_get_host_object(object);
 
-    return pixelscript_var_newi64(p->age);
+    return pxs_var_newi64(p->age);
 }
 
 Var* ps_greet(uintptr_t argc, struct Var **argv, void *opaque) { 
@@ -220,12 +220,12 @@ Var* ps_greet(uintptr_t argc, struct Var **argv, void *opaque) {
     Var *object = argv[1];
 
     // Runtime var
-    int runtime_int = pixelscript_var_get_i64(runtime);
-    Person* p = pixelscript_var_get_host_object(object);
+    int runtime_int = pxs_var_get_i64(runtime);
+    Person* p = pxs_var_get_host_object(object);
 
     print_person_info(runtime_int, p);
 
-    return pixelscript_var_newnull();
+    return pxs_var_newnull();
 }
 
 Var* new_person(uintptr_t argc, struct Var **argv, void *opaque) {
@@ -234,32 +234,32 @@ Var* new_person(uintptr_t argc, struct Var **argv, void *opaque) {
     Var* age_var = argv[2];
 
     // Get name string
-    char* name_str = pixelscript_var_get_string(name);
-    int age = pixelscript_var_get_i64(age_var);
+    char* name_str = pxs_var_get_string(name);
+    int age = pxs_var_get_i64(age_var);
 
     // Create person
     Person* p = create_person(name_str, age);
 
     // Free name
-    pixelscript_free_str(name_str);
+    pxs_free_str(name_str);
 
     // Create new object
-    PixelObject* object = pixelscript_new_object(p, destroy_person);
+    PixelObject* object = pxs_new_object(p, destroy_person);
     // Add methods
-    pixelscript_object_add_callback(object, "set_name", ps_set_name, NULL);
-    pixelscript_object_add_callback(object, "get_name", ps_get_name, NULL);
-    pixelscript_object_add_callback(object, "get_age", ps_get_age, NULL);
-    pixelscript_object_add_callback(object, "greet", ps_greet, NULL);
+    pxs_object_add_callback(object, "set_name", ps_set_name, NULL);
+    pxs_object_add_callback(object, "get_name", ps_get_name, NULL);
+    pxs_object_add_callback(object, "get_age", ps_get_age, NULL);
+    pxs_object_add_callback(object, "greet", ps_greet, NULL);
 
     // Return object
-    return pixelscript_var_newhost_object(object);
+    return pxs_var_newhost_object(object);
 }
 
 int main() {
-    pixelscript_initialize();
+    pxs_initialize();
 
     // Set the new_person object
-    pixelscript_add_object("Person", new_person, NULL);
+    pxs_add_object("Person", new_person, NULL);
     
     // Lua
     const char* lua_script = "local p = Person('Jordan', 23)\n"
@@ -268,8 +268,8 @@ int main() {
                          "p:greet()\n"
                          "p:set_name('Jordan Castro + ' .. p:get_age())\n"
                          "p:greet()\n";
-    char* res = pixelscript_exec_lua(lua_script, "<ctest>");
-    pixelscript_free_str(res);
+    char* res = pxs_exec_lua(lua_script, "<ctest>");
+    pxs_free_str(res);
 
     // Python
     const char* python_script = "p = Person('Jordan', 23)\n"
@@ -279,10 +279,10 @@ int main() {
                                 "p.set_name(f'Jordan Castro + {p.get_age()}')\n"
                                 "p.greet()\n";
 
-    char* res = pixelscript_exec_python(python_script, "<ctest>");
-    pixelscript_free_str(res);
+    char* res = pxs_exec_python(python_script, "<ctest>");
+    pxs_free_str(res);
 
-    pixelscript_finalize();
+    pxs_finalize();
 
     return 0;
 }
