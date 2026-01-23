@@ -21,15 +21,16 @@
 
 ## Functions
 <!-- - Use a Vector for lookup. -->
+- Use VarList instead of argc and argv?
 
 ## Modules
 
 ## Objects
 <!-- - Use a Vector for lookup. -->
 - Optomize Object creation. Potentially doing at `add` rather than callbacks.
+- For Object.calls take in a VarList instead of argc and argv?
 
 ## Vars
-- add Array type which holds many Vars.
 - Add exceptions
 
 ## STD
@@ -40,11 +41,15 @@
     - os
 
 ## Lua
+- Var List
+- Var Function
 
 ## Python (rustpython)
 - Eventually look back at this
 
 ## Python (PocketPy)
+- Var List
+- Var Function
 
 ## JS
 - add_variable

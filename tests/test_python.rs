@@ -112,13 +112,13 @@ mod tests {
             let typename = create_raw_string!("Person");
 
             let ptr = Person::into_raw(p) as *mut c_void;
-            let pixel_object = pixelscript_new_object(ptr, free_person, typename);
+            let pixel_object = pxs_new_object(ptr, free_person, typename);
             let set_name_raw = create_raw_string!("set_name");
             let get_name_raw = create_raw_string!("get_name");
-            pixelscript_object_add_callback(pixel_object, set_name_raw, set_name, opaque);
-            pixelscript_object_add_callback(pixel_object, get_name_raw, get_name, opaque);
+            pxs_object_add_callback(pixel_object, set_name_raw, set_name, opaque);
+            pxs_object_add_callback(pixel_object, get_name_raw, get_name, opaque);
             // Save...
-            let var = pixelscript_var_newhost_object(pixel_object);
+            let var = pxs_var_newhost_object(pixel_object);
 
             free_raw_string!(set_name_raw);
             free_raw_string!(get_name_raw);
@@ -205,12 +205,12 @@ mod tests {
     // // #[test]
     // fn test_add_variable() {
     //     println!("Inside test add variable");
-    //     pixelscript_initialize();
+    //     pxs_initialize();
     //     let name = create_raw_string!("name");
     //     let jordan = create_raw_string!("Jordan");
-    //     let var = pixelscript_var_newstring(jordan);
+    //     let var = pxs_var_newstring(jordan);
     //     println!("Before add variable");
-    //     pixelscript_add_variable(name, var);
+    //     pxs_add_variable(name, var);
     //     println!("After add variable");
     //     free_raw_string!(name);
     //     println!("Freed strings");
@@ -219,48 +219,48 @@ mod tests {
     // // #[test]
     // fn test_add_callback() {
     //     println!("Inside Test add callback");
-    //     pixelscript_initialize();
+    //     pxs_initialize();
     //     let name = create_raw_string!("println");
-    //     pixelscript_add_callback(name, print_wrapper, ptr::null_mut());
+    //     pxs_add_callback(name, print_wrapper, ptr::null_mut());
     //     free_raw_string!(name);
     // }
 
     // #[test]
     fn test_add_module() {
         println!("Inside Test add module");
-        pixelscript_initialize();
+        pxs_initialize();
         let module_name = create_raw_string!("pxs");
-        let module = pixelscript_new_module(module_name);
+        let module = pxs_new_module(module_name);
         // Save methods
         let add_name = create_raw_string!("add");
         let n1_name = create_raw_string!("n1");
         let n2_name: *mut i8 = create_raw_string!("n2");
-        pixelscript_add_callback(module, add_name, add_wrapper, ptr::null_mut());
-        let n1 = pixelscript_var_newint(1);
-        let n2 = pixelscript_var_newint(2);
-        pixelscript_add_variable(module, n1_name, n1);
-        pixelscript_add_variable(module, n2_name, n2);
+        pxs_add_callback(module, add_name, add_wrapper, ptr::null_mut());
+        let n1 = pxs_var_newint(1);
+        let n2 = pxs_var_newint(2);
+        pxs_add_variable(module, n1_name, n1);
+        pxs_add_variable(module, n2_name, n2);
 
         let name = create_raw_string!("print");
-        pixelscript_add_callback(module, name, print_wrapper, ptr::null_mut());
+        pxs_add_callback(module, name, print_wrapper, ptr::null_mut());
         let var_name = create_raw_string!("name");
         let jordan = create_raw_string!("Jordan");
-        let var = pixelscript_var_newstring(jordan);
-        pixelscript_add_variable(module, var_name, var);
+        let var = pxs_var_newstring(jordan);
+        pxs_add_variable(module, var_name, var);
 
         let object_name = create_raw_string!("Person");
-        pixelscript_add_object(module, object_name, new_person, ptr::null_mut());
+        pxs_add_object(module, object_name, new_person, ptr::null_mut());
 
         // Add a inner module
         let math_module_name = create_raw_string!("math");
-        let math_module = pixelscript_new_module(math_module_name);
+        let math_module = pxs_new_module(math_module_name);
 
         // Add a sub function
         let sub_name = create_raw_string!("sub");
-        pixelscript_add_callback(math_module, sub_name, sub_wrapper, ptr::null_mut());
+        pxs_add_callback(math_module, sub_name, sub_wrapper, ptr::null_mut());
 
-        pixelscript_add_submodule(module, math_module);
-        pixelscript_add_module(module);
+        pxs_add_submodule(module, math_module);
+        pxs_add_module(module);
 
         free_raw_string!(module_name);
         free_raw_string!(add_name);
@@ -275,16 +275,16 @@ mod tests {
 
     // // #[test]
     // fn test_add_object() {
-    //     pixelscript_initialize();
+    //     pxs_initialize();
     //     let object_name = create_raw_string!("Person");
-    //     pixelscript_add_object(object_name, new_person, ptr::null_mut());
+    //     pxs_add_object(object_name, new_person, ptr::null_mut());
     //     free_raw_string!(object_name);
     // }
 
     #[test]
     fn test_execute() {
         println!("Test starting");
-        pixelscript_initialize();
+        pxs_initialize();
 
         // test_add_variable();
         // println!("Var");
@@ -295,7 +295,7 @@ mod tests {
         // test_add_object();
         // println!("Object");
 
-        pixelscript_set_file_reader(file_loader);
+        pxs_set_file_reader(file_loader);
 
         //         let py_code = r#"
         // println('Welcome ' + name, '2', '3', '4', '5', '6')
@@ -340,12 +340,12 @@ print(type(pxs.Person).__name__)
         "#;
         let err = PythonScripting::execute(py_code, "<test>");
 
-        pixelscript_start_thread();
-        pixelscript_start_thread();
-        pixelscript_stop_thread();
-        pixelscript_stop_thread();
+        pxs_start_thread();
+        pxs_start_thread();
+        pxs_stop_thread();
+        pxs_stop_thread();
 
-        pixelscript_finalize();
+        pxs_finalize();
         assert!(err.is_empty(), "Python Error is not empty: {}", err);
     }
 }

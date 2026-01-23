@@ -11,6 +11,7 @@ use std::{
     collections::{HashMap, HashSet},
 };
 
+use anyhow::anyhow;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 
 use crate::{
@@ -295,6 +296,15 @@ impl PixelScript for PythonScripting {
     }
 }
 
+/// Add pxs vars to the stack
+fn add_args(args: &Vec<&mut pxs_Var>) {
+    // Convert args into py_Ref
+    for i in 0..args.len() {
+        let pyref = unsafe { pocketpy::py_pushtmp() };
+        var_to_pocketpyref(pyref, &args[i]);
+    }
+}
+
 impl ObjectMethods for PythonScripting {
     fn object_call(
         var: &crate::shared::var::pxs_Var,
@@ -320,11 +330,7 @@ impl ObjectMethods for PythonScripting {
             // Push self
             pocketpy::py_push(obj_ref);
 
-            // Convert args into py_Ref
-            for i in 0..args.len() {
-                let pyref = pocketpy::py_pushtmp();
-                var_to_pocketpyref(pyref, &args[i]);
-            }
+            add_args(args);
 
             // Now call
             // Result is py_retval
@@ -376,10 +382,7 @@ impl ObjectMethods for PythonScripting {
             // Push self, in this case nil.
             pocketpy::py_pushnil();
 
-            for i in 0..args.len() {
-                let tmp_reg = pocketpy::py_pushtmp();
-                var_to_pocketpyref(tmp_reg, &args[i]);
-            }
+            add_args(args);
 
             // Call it via vectrocall
             let ok = pocketpy::py_vectorcall(args.len() as u16, 0);
@@ -392,5 +395,33 @@ impl ObjectMethods for PythonScripting {
             
             Ok(final_var)
         }
+    }
+    
+    fn var_call(method: &pxs_Var, args: &Vec<&mut pxs_Var>) -> Result<pxs_Var, anyhow::Error> {
+        // Make sure it's a function!
+        if !method.is_function() {
+            return Err(anyhow!("Expected Function, found: {:#?}", method.tag));
+        }
+
+        // Get ptr as py_ref
+        let fn_ptr = method.get_function().unwrap();
+        let pyfn = fn_ptr as pocketpy::py_Ref;
+
+        // Now prepare the stack!
+        unsafe {
+            pocketpy::py_push(pyfn);
+            pocketpy::py_pushnil();
+        }
+
+        // Add args
+        add_args(args);
+
+        // Call it via vectrocall
+        let ok = unsafe { pocketpy::py_vectorcall(args.len() as u16, 0) };
+        if !ok {
+            return Ok(pxs_Var::new_null());
+        }
+
+        unsafe { Ok(pocketpyref_to_var(pocketpy::py_retval())) }
     }
 }

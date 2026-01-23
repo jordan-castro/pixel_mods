@@ -100,6 +100,8 @@ pub(super) fn var_to_pocketpyref(out: pocketpy::py_Ref, var: &pxs_Var) {
                 // Assign again
                 *out = *(*lang_ptr as pocketpy::py_Ref);
             },
+            pxs_VarType::List => todo!(),
+            pxs_VarType::Function => todo!(),
         }
     }
 }

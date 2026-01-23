@@ -13,7 +13,10 @@ use std::{
 
 use anyhow::{Error, anyhow};
 
-use crate::{borrow_string, create_raw_string, shared::{PtrMagic, object::get_object}};
+use crate::{
+    borrow_string, create_raw_string,
+    shared::{PtrMagic, object::get_object},
+};
 
 /// Macro for writing out the Var:: get methods.
 macro_rules! write_func {
@@ -81,41 +84,44 @@ pub enum pxs_VarType {
     String,
     Bool,
     Float64,
-    /// Lua (nil), Python (None), JS/easyjs (null)
+    /// Lua (nil), Python (None), JS/easyjs (null/undefined)
     Null,
     /// Lua (Tree), Python (Class), JS/easyjs (Prototype)
     Object,
     /// Host object converted when created.
     /// Lua (Tree), Python (object), JS/easyjs (Prototype think '{}')
     HostObject,
+    /// Lua (Tree), Python (list), JS/easyjs (Array)
     List,
+    /// Lua (Value), Python (def or lambda), JS/easyjs (anon function)
+    Function,
 }
 
 /// Holds data for a pxs_Var of list.
-/// 
+///
 /// It holds multiple pxsVar within.
-/// 
+///
 /// When creating call:
-/// 
+///
 /// `pixelscript_var_newlist()`.
-/// 
+///
 /// To add items
-/// 
+///
 /// `pixelscript_var_list_add(list_ptr, item_ptr)`
-/// 
+///
 /// To get items
-/// 
+///
 /// `pixelscript_var_list_get(list_ptr, index)`
-/// 
+///
 /// A full example looks like:
 /// ```c
 /// // Create a new list (you never interact with pxs_VarList directly...)
 /// pxs_Var* list = pixelscript_var_newlist();
-/// 
+///
 /// // Add a item
 /// pxs_Var* number = pixelscript_var_newint(1);
 /// pixelscript_var_list_add(list, number);
-/// 
+///
 /// // Get a item
 /// pxs_Var* item_got = pixelscript_var_list_get(list, 0);
 /// ```
@@ -142,7 +148,7 @@ impl pxs_VarList {
         // Get correct negative index.
         let r_index = {
             if index < 0 {
-                (self.vars.len() as i32) + index    
+                (self.vars.len() as i32) + index
             } else {
                 index
             }
@@ -156,10 +162,30 @@ impl pxs_VarList {
     }
 
     /// Set at a specific index a item.
-    /// 
+    ///
     /// Index must already be filled.
     pub fn set_item(&mut self, item: pxs_Var, index: i32) -> bool {
-        // TODO!
+        // Get correct negative index.
+        let r_index = {
+            if index < 0 {
+                (self.vars.len() as i32) + index
+            } else {
+                index
+            }
+        };
+
+        if r_index < 0 {
+            return false;
+        }
+
+        let r_index = ((self.vars.len() as i32) + index) as usize;
+
+        if self.vars.len() < r_index {
+            false
+        } else {
+            self.vars[r_index] = item;
+            true
+        }
     }
 }
 
@@ -175,8 +201,9 @@ pub union pxs_VarValue {
     pub null_val: *const c_void,
     pub object_val: *mut c_void,
     pub host_object_val: i32,
-    pub list_val: *mut pxs_VarList
-} 
+    pub list_val: *mut pxs_VarList,
+    pub function_val: *mut c_void,
+}
 
 /// A PixelScript Var(iable).
 ///
@@ -187,7 +214,10 @@ pub union pxs_VarValue {
 /// - float (f32, f64)
 /// - string
 /// - boolean
-/// - Objects (these are a more of a pseudo-type)
+/// - Objects 
+/// - HostObjects (C structs acting as pseudo-classes)
+/// - List
+/// - Functions (First class functions)
 ///
 /// When working with objects you must use the C-api:
 /// ```c
@@ -292,9 +322,17 @@ impl pxs_Var {
     pub fn new_list() -> Self {
         pxs_Var {
             tag: pxs_VarType::List,
-            value: pxs_VarValue { 
-              list_val: pxs_VarList::new().into_raw()
+            value: pxs_VarValue {
+                list_val: pxs_VarList::new().into_raw(),
             },
+        }
+    }
+
+    /// Create a new Function var.
+    pub fn new_function(ptr: *mut c_void) -> Self {
+        pxs_Var {
+            tag: pxs_VarType::Function,
+            value: pxs_VarValue { function_val: ptr },
         }
     }
 
@@ -353,92 +391,28 @@ impl pxs_Var {
         if !self.is_list() {
             None
         } else {
-            unsafe {
-                Some(pxs_VarList::from_borrow(self.value.list_val))
-            }
+            unsafe { Some(pxs_VarList::from_borrow(self.value.list_val)) }
         }
     }
 
-    // /// Get Big Integer value
-    // pub fn get_bigint(&self) -> i64 {
-    //     match self.tag {
-    //         VarType::Int32 => self.get_i32().unwrap() as i64,
-    //         VarType::Int64 => self.get_i64().unwrap() as i64,
-    //         VarType::UInt32 => self.get_u32().unwrap() as i64,
-    //         VarType::UInt64 => self.get_u64().unwrap() as i64,
-    //         VarType::Float32 => self.get_f32().unwrap() as i64,
-    //         VarType::Float64 => self.get_f64().unwrap() as i64,
-    //         _ => {
-    //             -1
-    //         }
-    //     }
-    // }
+    ///
+    pub unsafe fn from_argv(argc: usize, argv: *mut *mut pxs_Var) -> Vec<pxs_Var> {
+        // First create a slice
+        let argv_borrow = unsafe { pxs_Var::slice_raw(argv, argc) };
+        // Now clone them!
+        let cloned: Vec<pxs_Var> = argv_borrow.iter().filter(|ptr| !ptr.is_null())
+        .map(|&ptr| unsafe { (*ptr).clone() })
+        .collect();
 
-    // /// Get Int32 value
-    // pub fn get_int(&self) -> i32 {
-    //     match self.tag {
-    //         VarType::Int32 => self.get_i32().unwrap(),
-    //         VarType::UInt32 => self.get_u32().unwrap() as i32,
-    //         VarType::Float32 => self.get_f32().unwrap() as i32,
-    //         _ => {
-    //             -1
-    //         }
-    //     }
-    // }
-
-    // /// Get UInt value
-    // pub fn get_uint(&self) -> u32 {
-    //     match self.tag {
-    //         VarType::UInt32 => self.get_u32().unwrap(),
-    //         _ => {
-    //             0
-    //         }
-    //     }
-    // }
-
-    // /// Get BigUint value
-    // pub fn get_biguint(&self) -> u64 {
-    //     match self.tag {
-    //         VarType::UInt32 => self.get_u32().unwrap() as u64,
-    //         VarType::UInt64 => self.get_u64().unwrap(),
-    //         _ => {
-    //             0
-    //         }
-    //     }
-    // }
-
-    // /// Get BigFloat value
-    // pub fn get_bigfloat(&self) -> f64 {
-    //     match self.tag {
-    //         VarType::Int32 => self.get_i32().unwrap() as f64,
-    //         VarType::Int64 => self.get_i64().unwrap() as f64,
-    //         VarType::UInt32 => self.get_u32().unwrap() as f64,
-    //         VarType::UInt64 => self.get_u64().unwrap() as f64,
-    //         VarType::Float32 => self.get_f32().unwrap() as f64,
-    //         VarType::Float64 => self.get_f64().unwrap(),
-    //         _ => {
-    //             -1.0
-    //         }
-    //     }
-    // }
-
-    // /// Get Float value
-    // pub fn get_float(&self) -> f32 {
-    //     match self.tag {
-    //         VarType::Int32 => self.get_i32().unwrap() as f32,
-    //         VarType::UInt32 => self.get_u32().unwrap() as f32,
-    //         VarType::Float32 => self.get_f32().unwrap(),
-    //         _ => {
-    //             -1.0
-    //         }
-    //     }
-    // }
+        cloned
+    }
 
     write_func!(
         (get_i64, i64_val, i64, pxs_VarType::Int64),
         (get_u64, u64_val, u64, pxs_VarType::UInt64),
         (get_bool, bool_val, bool, pxs_VarType::Bool),
-        (get_f64, f64_val, f64, pxs_VarType::Float64)
+        (get_f64, f64_val, f64, pxs_VarType::Float64),
+        (get_function, function_val, *mut c_void, pxs_VarType::Function)
     );
 
     // $t:ty, $func:ident, $vt:expr, $vn:ident
@@ -458,7 +432,8 @@ impl pxs_Var {
         is_null, pxs_VarType::Null;
         is_object, pxs_VarType::Object;
         is_host_object, pxs_VarType::HostObject;
-        is_list, pxs_VarType::List
+        is_list, pxs_VarType::List;
+        is_function, pxs_VarType::Function
     }
 }
 
@@ -473,8 +448,8 @@ impl Drop for pxs_Var {
                 }
             }
         } else if self.tag == pxs_VarType::List {
-            let _ = unsafe {  
-                // This will automatically drop 
+            let _ = unsafe {
+                // This will automatically drop
                 pxs_VarList::from_raw(self.value.list_val)
             };
         }
@@ -494,12 +469,12 @@ impl Clone for pxs_Var {
                     let cloned_string = string.to_string().clone();
                     let new_string = create_raw_string!(cloned_string);
                     pxs_Var {
-                    tag: pxs_VarType::String,
-                    value: pxs_VarValue {
-                        string_val: new_string,
-                    },
+                        tag: pxs_VarType::String,
+                        value: pxs_VarValue {
+                            string_val: new_string,
+                        },
+                    }
                 }
-            },
                 pxs_VarType::Bool => pxs_Var::new_bool(self.value.bool_val),
                 pxs_VarType::Float64 => pxs_Var::new_f64(self.value.f64_val),
                 pxs_VarType::Null => pxs_Var::new_null(),
@@ -524,9 +499,12 @@ impl Clone for pxs_Var {
                     pxs_Var {
                         tag: pxs_VarType::List,
                         value: pxs_VarValue {
-                            list_val: list.into_raw()
-                        }
+                            list_val: list.into_raw(),
+                        },
                     }
+                },
+                pxs_VarType::Function => {
+                    pxs_Var::new_function(self.value.function_val)
                 }
             }
         }
@@ -540,4 +518,7 @@ pub trait ObjectMethods {
 
     /// Call a method and pass in args
     fn call_method(method: &str, args: &Vec<&mut pxs_Var>) -> Result<pxs_Var, Error>;
+
+    /// Call a pxs_Var function.
+    fn var_call(method: &pxs_Var, args: &Vec<&mut pxs_Var>) -> Result<pxs_Var, Error>;
 }

@@ -11,13 +11,14 @@ pub mod module;
 pub mod object;
 pub mod var;
 
+use anyhow::anyhow;
 use mlua::prelude::*;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
     lua::var::{from_lua, into_lua},
-    shared::{PixelScript, object::get_object, read_file, var::ObjectMethods},
+    shared::{PixelScript, object::get_object, read_file, var::{ObjectMethods, pxs_Var}},
 };
 
 thread_local! {
@@ -157,6 +158,18 @@ impl PixelScript for LuaScripting {
     }
 }
 
+/// Convert args for ObjectMethods into LuaMutliValue
+fn args_to_lua(args: &Vec<&mut pxs_Var>) -> LuaMultiValue {
+    let mut lua_args = vec![];
+    let state = get_lua_state();
+    for arg in args.iter() {
+        lua_args.push(into_lua(&state.engine, arg).expect("Could not convert Var into Lua Var"));
+    }
+
+    // Pack lua args
+    state.engine.pack_multi(lua_args).expect("Could not pack Lua args.")
+}
+
 impl ObjectMethods for LuaScripting {
     fn object_call(
         var: &crate::shared::var::pxs_Var,
@@ -181,21 +194,9 @@ impl ObjectMethods for LuaScripting {
             }
         };
 
-        // Call method
-        let mut lua_args = vec![];
-        // State start
-        let state = get_lua_state();
-        for arg in args.iter() {
-            lua_args
-                .push(into_lua(&state.engine, arg).expect("Could not convert Var into Lua Var"));
-        }
-        // pack lua args
-        let packed = state
-            .engine
-            .pack_multi(lua_args)
-            .expect("Could not pack Lua args.");
+        let lua_args = args_to_lua(args);
         let res = table
-            .call_function(method, packed)
+            .call_function(method, lua_args)
             .expect("Could not call function on Lua Table.");
 
         let pixel_res = from_lua(res).expect("Could not convert LuaVar into PixelScript Var.");
@@ -209,23 +210,36 @@ impl ObjectMethods for LuaScripting {
         args: &Vec<&mut crate::shared::var::pxs_Var>,
     ) -> Result<crate::shared::var::pxs_Var, anyhow::Error> {
         // Get args as lua args
-        let mut lua_args = vec![];
+        let lua_args = args_to_lua(args);
         let state = get_lua_state();
-        for arg in args.iter() {
-            lua_args
-                .push(into_lua(&state.engine, arg).expect("Could not convert Var into Lua Var."));
-        }
 
         let function: LuaFunction = state.engine.globals().get(method)?;
         let res: LuaValue = function
-            .call(
-                state
-                    .engine
-                    .pack_multi(lua_args)
-                    .expect("Could not pack Lua args."),
-            )
+            .call(lua_args)
             .expect("Could not call Lua method.");
 
+        from_lua(res)
+    }
+
+    fn var_call(
+        method: &crate::shared::var::pxs_Var,
+        args: &Vec<&mut crate::shared::var::pxs_Var>,
+    ) -> Result<crate::shared::var::pxs_Var, anyhow::Error> {
+        if !method.is_function() {
+            return Err(anyhow!("Expected a Function, found a: {:#?}", method.tag));
+        }
+
+        // Get the pointer and convert it into a LuaFunction
+        let fn_ptr = method.get_function().unwrap();
+        let lua_function = fn_ptr as *const LuaFunction;
+
+        // Convert  the methods into lua args
+        let lua_args = args_to_lua(args);
+
+        // Call function
+        let res: LuaValue = (unsafe { &*lua_function }).call(lua_args).expect("Could not call Lua method.");
+
+        // Convert into pxs
         from_lua(res)
     }
 }

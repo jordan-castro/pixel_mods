@@ -49,7 +49,7 @@ macro_rules! create_raw_string {
     ($rstr:expr) => {{ std::ffi::CString::new($rstr).unwrap().into_raw() }};
 }
 
-    /// Free a raw sring
+/// Free a raw sring
 #[macro_export]
     macro_rules! free_raw_string {
         ($rptr:expr) => {{
@@ -58,3 +58,20 @@ macro_rules! create_raw_string {
             }
         }};
     }
+
+
+/// simple Borrow a Var.
+#[macro_export]
+macro_rules! borrow_var {
+    ($var:expr) => {{
+        unsafe{ pxs_Var::from_borrow($var) }   
+    }};
+}
+
+/// Own a Var.
+#[macro_export]
+macro_rules! own_var {
+    ($var:expr) => {{
+        pxs_Var::from_raw($var)    
+    }};
+}
