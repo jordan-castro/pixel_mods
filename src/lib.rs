@@ -285,6 +285,8 @@ pub extern "C" fn pxs_addvar(
     let module = unsafe { pxs_Module::from_borrow(module_ptr) };
     let name_str = borrow_string!(name);
 
+    let var_borrow = borrow_var!(variable);
+
     // Now add variable
     module.add_variable(name_str, variable);
 }
@@ -345,7 +347,7 @@ pub extern "C" fn pxs_freemod(module_ptr: *mut pxs_Module) {
 
 /// Create a new object.
 ///
-/// This should only be used within a PixelScript function callback, or globally set to 1 variable.
+/// This should only be used within a PixelScript function callback. I.e. a constructor.
 ///
 /// This must be wrapped in a `pxs_var_object` before use within a callback. If setting to a variable, this is done automatically for you.
 #[unsafe(no_mangle)]
@@ -451,7 +453,8 @@ pub extern "C" fn pxs_newhost(pixel_object: *mut pxs_PixelObject) -> *mut pxs_Va
     assert_initiated!();
 
     if pixel_object.is_null() {
-        return pxs_Var::new_null().into_raw();
+        return ptr::null_mut();
+        // return pxs_Var::new_null().into_raw();
     }
 
     // Own the pixel_object
@@ -577,14 +580,14 @@ pub extern "C" fn pxs_objectcall(
             with_feature!(
                 "lua",
                 { LuaScripting::object_call(var_borrow, method_borrow, list) },
-                { Ok(pxs_Var::new_null()) }
+                { Err(()) }
             )
         }
         pxs_Runtime::pxs_Python => {
             with_feature!(
                 "python",
                 { PythonScripting::object_call(var_borrow, method_borrow, list) },
-                { Ok(pxs_Var::new_null()) }
+                { Err(()) }
             )
         }
         pxs_Runtime::pxs_JavaScript => todo!(),
@@ -824,14 +827,15 @@ pub extern "C" fn pxs_call(
         let res = match rt {
             pxs_Runtime::pxs_Lua => {
                 with_feature!("lua", { LuaScripting::call_method(method_borrow, list) }, {
-                    Ok(pxs_Var::new_null())
+                    Err(())
+                    // Ok(pxs_Var::new_null())
                 })
             }
             pxs_Runtime::pxs_Python => {
                 with_feature!(
                     "python",
                     { PythonScripting::call_method(method_borrow, list) },
-                    { Ok(pxs_Var::new_null()) }
+                    { Err(()) }
                 )
             }
             _ => todo!(), // pxs_Runtime::pxs_JavaScript => todo!(),
@@ -896,12 +900,14 @@ pub extern "C" fn pxs_tostring(runtime: *mut pxs_Var, var: *mut pxs_Var) -> *mut
         let res = match runtime {
             pxs_Runtime::pxs_Lua => {
                 with_feature!("lua", { LuaScripting::call_method("tostring", list) }, {
-                    Ok(pxs_Var::new_null())
+                    Err(())
+                    // Ok(pxs_Var::new_null())
                 })
             }
             pxs_Runtime::pxs_Python => {
                 with_feature!("python", { PythonScripting::call_method("str", list) }, {
-                    Ok(pxs_Var::new_null())
+                    Err(())
+                    // Ok(pxs_Var::new_null())
                 })
             }
             pxs_Runtime::pxs_JavaScript => todo!(),
@@ -1086,14 +1092,14 @@ pub extern "C" fn pxs_varcall(
                 with_feature!(
                     "lua",
                     { LuaScripting::var_call(borrow_func, list).unwrap() },
-                    { pxs_Var::new_null() }
+                    { Err(()) }
                 )
             }
             pxs_Runtime::pxs_Python => {
                 with_feature!(
                     "python",
                     { PythonScripting::var_call(borrow_func, list).unwrap() },
-                    { pxs_Var::new_null() }
+                    { Err(()) }
                 )
             }
             pxs_Runtime::pxs_JavaScript => todo!(),
@@ -1108,7 +1114,7 @@ pub extern "C" fn pxs_varcall(
         ptr::null_mut()
     }
 }
- 
+
 /// Copy the pxs_Var.
 ///
 /// Memory is handled by caller

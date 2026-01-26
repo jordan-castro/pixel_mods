@@ -107,7 +107,7 @@ print(data.fullname)
  -->
 ## Building
 In order to use pixelscript, you need to first compile it's libraries. Each language could potentially have it's own libraries.
-Each library will be fetched and placed under a pixel_script folder in the main directory of your build system.
+Each library will be fetched and placed under a pxsb folder in the main directory of your build system.
 
 To build simply run:
 ```bash
@@ -116,174 +116,75 @@ cargo build --release
 On your rust crate. This will build the pixelscript library and make all language libs accessible.
 
 ## Example
+Here is a "Hello World" example supporting Lua, Python, PHP, JavaScript, and easyjs.
 ```c
-#include "pixel_script.h"
+#include "pixelscript.h"
+// Optional macros (for C/C++ codespaces)
+#include "pixelscript_m.h"
 
-// ========================== C Binding (START) ==========================
+// One with the macro
+PXS_HANDLER(mprintln) {
+    pxs_VarT contents_var = PXS_ARG(1);
+    char* contents_str = pxs_getstring(contents_var);
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+    printf("%s", contents_str);
 
-// Define the Struct
-typedef struct Person {
-    char *name;
-    int age;
-
-    // Function pointer to act as a "method"
-    void (*print_info)(struct Person *self);
-} Person;
-
-// Implementation of the print method
-void print_person_info(PixelScriptRuntime runtime, Person *self) {
-    if (self != NULL) {
-        char* rt = "Unkown";
-        if (runtime == Lua) {
-            rt = "Lua";
-        } else if (runtime == Python) {
-            rt = "Python";
-        } else if (runtime == JavaScript) {
-            rt = "JavaScript";
-        } else if (runtime == Easyjs) {
-            rt = "EasyJS";
-        }
-        printf("From runtime: %s, My name is: %s, and I am %d years old\n", rt, self->name, self->age);
-    }
+    // Free the string
+    pxs_freestr(contents_str);
 }
 
-// "Getter" for Name
-const char* get_name(Person *self) {
-    return self->name;
-}
+// One without the macro
+pxs_VarT println(pxs_VarT args, pxs_Opaque opaque) {
+    // Get contents
+    pxs_VarT contents_var = pxs_listget(args, 1);
+    char* contents_str = pxs_getstring(contents_var);
 
-// "Getter" for Age
-int get_age(Person *self) {
-    return self->age;
-}
+    printf("%s", contents_str);
 
-// "Setter" for Name
-void set_name(Person *self, const char* name) {
-    // Free old name
-    free(self->name);
-    self->name = strdup(name);
-} 
-
-// Constructor-like function to initialize the struct
-Person* create_person(const char *name, int age) {
-    Person *p = malloc(sizeof(Person));
-    p->name = strdup(name); // Duplicate string to ensure it persists
-    p->age = age;
-    return p;
-}
-
-// Destructor to free memory
-void destroy_person(Person *p) {
-    free(p->name);
-    free(p);
-}
-
-// ========================== C Binding (END) ==========================
-
-pxs_Var* ps_set_name(pxs_VarList* args, void *opaque) {
-    int argc = pxs_listlen(args);
-    pxs_Var* runtime = pxs_listget(args, 0);
-    pxs_Var* self = pxs_listget(args, 1);
-    pxs_Var* name - pxs_listget(args, 2);
-
-    pxs_add(args, pxs_newint(0))
-
-    Person* p = pxs_gethost(self);
-    char* new_name = pxs_getstring(name);
-
-    set_name(p, new_name);
-
-    pxs_freestr(new_name);
-
-    return pxs_newnull();
-}
-
-Var* ps_get_name(uintptr_t argc, struct Var **argv, void *opaque) {
-    Var* object = argv[1];
-    
-    Person* p = pxs_var_get_host_object(object);
-
-    return pxs_var_newstring(p->name);
-}
-
-Var* ps_get_age(uintptr_t argc, struct Var **argv, void *opaque) { 
-    Var* object = argv[1];
-
-    Person* p = pxs_var_get_host_object(object);
-
-    return pxs_var_newi64(p->age);
-}
-
-Var* ps_greet(uintptr_t argc, struct Var **argv, void *opaque) { 
-    Var *runtime = argv[0];
-    Var *object = argv[1];
-
-    // Runtime var
-    int runtime_int = pxs_var_get_i64(runtime);
-    Person* p = pxs_var_get_host_object(object);
-
-    print_person_info(runtime_int, p);
-
-    return pxs_var_newnull();
-}
-
-Var* new_person(uintptr_t argc, struct Var **argv, void *opaque) {
-    // Assume 1 and 2 are name and age
-    Var* name = argv[1];
-    Var* age_var = argv[2];
-
-    // Get name string
-    char* name_str = pxs_var_get_string(name);
-    int age = pxs_var_get_i64(age_var);
-
-    // Create person
-    Person* p = create_person(name_str, age);
-
-    // Free name
-    pxs_free_str(name_str);
-
-    // Create new object
-    PixelObject* object = pxs_new_object(p, destroy_person);
-    // Add methods
-    pxs_object_add_callback(object, "set_name", ps_set_name, NULL);
-    pxs_object_add_callback(object, "get_name", ps_get_name, NULL);
-    pxs_object_add_callback(object, "get_age", ps_get_age, NULL);
-    pxs_object_add_callback(object, "greet", ps_greet, NULL);
-
-    // Return object
-    return pxs_var_newhost_object(object);
+    // Free the string
+    pxs_freestr(contents_str);
 }
 
 int main() {
     pxs_initialize();
-
-    // Set the new_person object
-    pxs_add_object("Person", new_person, NULL);
     
+    // Create a module
+    pxs_Module* main = pxs_newmod("main");
+
+    // Add callbacks
+    pxs_addfunc(main, "mprintln", mprintln, NULL);
+    pxs_addfunc(main, "println", println, NULL);
+
     // Lua
-    const char* lua_script = "local p = Person('Jordan', 23)\n"
-                         "p:greet()\n"
-                         "p:set_name('Jordan Castro')\n"
-                         "p:greet()\n"
-                         "p:set_name('Jordan Castro + ' .. p:get_age())\n"
-                         "p:greet()\n";
-    char* res = pxs_exec_lua(lua_script, "<ctest>");
-    pxs_free_str(res);
+    const char* lua_script = "local main = require('main')\n"
+        "main.print('Hello World from Lua!')";
+    char* error = pxs_execlua(lua_script, "<ctest>");
+    pxs_freestr(error);
 
     // Python
-    const char* python_script = "p = Person('Jordan', 23)\n"
-                                "p.greet()\n"
-                                "p.set_name('Jordan Castro')\n"
-                                "p.greet()\n"
-                                "p.set_name(f'Jordan Castro + {p.get_age()}')\n"
-                                "p.greet()\n";
+    const char* python_script = "import main\n"
+                                "main.print('Hello World from Python')\n";
 
-    char* res = pxs_exec_python(python_script, "<ctest>");
-    pxs_free_str(res);
+    char* error = pxs_execpython(python_script, "<ctest>");
+    pxs_freestr(error);
+
+    // JavaScript
+    const char* js_script = "import * as main from 'main';\n"
+                            "main.print('Hello World from JavaScript!');";
+    char* error = pxs_execjs(js_script, "<ctest>");
+    pxs_freestr(error);
+
+    // easyjs
+    const char* ej_script = "import 'main'\n"
+                            "main.print('Hello World from easyjs!')";
+    char* error = pxs_execej(ej_script, "<ctest>");
+    pxs_freestr(error);
+
+    // PHP!!!! 
+    const char* php_script = "include('main');\n" // or require
+                            "main.print('Hello World from PHP!');";
+    char* error = pxs_execphp(php_script, "<ctest>");
+    pxs_freestr(error);
 
     pxs_finalize();
 

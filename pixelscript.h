@@ -389,7 +389,7 @@ void pxs_freemod(struct pxs_Module *module_ptr);
 /**
  * Create a new object.
  *
- * This should only be used within a PixelScript function callback, or globally set to 1 variable.
+ * This should only be used within a PixelScript function callback. I.e. a constructor.
  *
  * This must be wrapped in a `pxs_var_object` before use within a callback. If setting to a variable, this is done automatically for you.
  */

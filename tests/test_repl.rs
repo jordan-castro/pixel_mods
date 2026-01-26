@@ -17,7 +17,10 @@ mod tests {
     use pixelscript::{
         lua::LuaScripting,
         python::PythonScripting,
-        shared::{PixelScript, PtrMagic, pxs_DirHandle, pxs_Runtime, var::{pxs_Var, pxs_VarT}},
+        shared::{
+            PixelScript, PtrMagic, pxs_DirHandle, pxs_Runtime,
+            var::{pxs_Var, pxs_VarT},
+        },
         *,
     };
 
@@ -45,7 +48,9 @@ mod tests {
 
     impl TodoList {
         pub fn new(initial_items: Vec<String>) -> Self {
-            TodoList { items: initial_items }
+            TodoList {
+                items: initial_items,
+            }
         }
 
         pub fn add_item(&mut self, item: &str) {
@@ -60,41 +65,9 @@ mod tests {
     impl PtrMagic for TodoList {}
 
     pub extern "C" fn free_todolist(ptr: *mut c_void) {
+        println!("Freeing TODOList!");
         let _ = unsafe { TodoList::from_borrow(ptr as *mut TodoList) };
     }
-
-    // pub extern "C" fn new_todolist(args: pxs_VarT, _opaque: pxs_Opaque) -> pxs_VarT {
-    //     unsafe {
-    //         // Expect a list
-    //         let list = pxs_listget(args, 1);
-    //         // Add the iteam
-    //         let mut strings = vec![];
-    //         for i in 0..pxs_listlen(list) {
-    //             let string = pxs_getstring(pxs_listget(list, i));
-    //             let rstring = own_string!(string);
-
-    //             strings.push(rstring);
-    //         }
-
-    //         // Now add to new object
-    //         let todolist = TodoList::new(strings);
-
-    //         let ptr = todolist.into_raw();
-    //         let typename = create_raw_string!("TodoList");
-    //         let object = pxs_newobject(ptr as *mut c_void, free_todolist, typename);
-    //         free_raw_string!(typename);
-
-    //         let func_name = create_raw_string!("get_item");
-    //         pxs_object_addfunc(object, func_name, get_item, ptr::null_mut());
-    //         free_raw_string!(func_name);
-
-    //         let func_name = create_raw_string!("add_item");
-    //         pxs_object_addfunc(object, func_name, add_item, ptr::null_mut());
-    //         free_raw_string!(func_name);
-
-    //         pxs_newnull()
-    //     }
-    // }
 
     pub extern "C" fn get_item(args: *mut pxs_Var, _opaque: pxs_Opaque) -> pxs_VarT {
         unsafe {
@@ -104,7 +77,8 @@ mod tests {
             let index = borrow_var!(pxs_listget(args, 2));
 
             // Get TodoList
-            let todolist = unsafe { TodoList::from_borrow(pxs_gethost(pxsobject) as *mut TodoList) };
+            let todolist =
+                unsafe { TodoList::from_borrow(pxs_gethost(pxsobject) as *mut TodoList) };
 
             // Get at index
             let item = todolist.get_item(pxs_getint(index) as usize);
@@ -130,7 +104,8 @@ mod tests {
             let item = borrow_var!(pxs_listget(args, 2));
 
             // Derefernce
-            let todolist = unsafe { TodoList::from_borrow(pxs_gethost(pxsobject) as *mut TodoList) };
+            let todolist =
+                unsafe { TodoList::from_borrow(pxs_gethost(pxsobject) as *mut TodoList) };
 
             // Get string
             let item_str = pxs_getstring(item);
@@ -324,30 +299,6 @@ mod tests {
         }
     }
 
-    // // #[test]
-    // fn test_add_variable() {
-    //     println!("Inside test add variable");
-    //     pxs_initialize();
-    //     let name = create_raw_string!("name");
-    //     let jordan = create_raw_string!("Jordan");
-    //     let var = pxs_var_newstring(jordan);
-    //     println!("Before add variable");
-    //     pxs_add_variable(name, var);
-    //     println!("After add variable");
-    //     free_raw_string!(name);
-    //     println!("Freed strings");
-    // }
-
-    // // #[test]
-    // fn test_add_callback() {
-    //     println!("Inside Test add callback");
-    //     pxs_initialize();
-    //     let name = create_raw_string!("println");
-    //     pxs_add_callback(name, print_wrapper, ptr::null_mut());
-    //     free_raw_string!(name);
-    // }
-
-    // #[test]
     fn test_add_module() {
         println!("Inside Test add module");
         pxs_initialize();
@@ -377,26 +328,32 @@ mod tests {
         let math_module_name = create_raw_string!("math");
         let math_module = pxs_newmod(math_module_name);
 
-        // Add the todolist to the math module.
-        let todolist = TodoList::new(vec![]).into_raw();
-        let typename = create_raw_string!("TodoList");
-        let object = pxs_newobject(todolist as *mut c_void, free_todolist, typename);
-        free_raw_string!(typename);
-        // Add methods
-        let func_name = create_raw_string!("add_item");
-        pxs_object_addfunc(object, func_name, add_item, ptr::null_mut());
-        free_raw_string!(func_name);
-        let func_name = create_raw_string!("get_item");
-        free_raw_string!(func_name);
-        pxs_object_addfunc(object, func_name, get_item, ptr::null_mut());
+        // // Add the todolist to the math module.
+        // let todolist = TodoList::new(vec![]).into_raw();
+        // let typename = create_raw_string!("TodoList");
+        // let object = pxs_newobject(todolist as *mut c_void, free_todolist, typename);
+        // free_raw_string!(typename);
+        // // Add methods
+        // let func_name = create_raw_string!("add_item");
+        // pxs_object_addfunc(object, func_name, add_item, ptr::null_mut());
+        // free_raw_string!(func_name);
+        // let func_name = create_raw_string!("get_item");
+        // free_raw_string!(func_name);
+        // pxs_object_addfunc(object, func_name, get_item, ptr::null_mut());
 
-        println!("Before adding new variable");
-        // Set variable
-        let var_name2 = create_raw_string!("todo");
-        pxs_addvar(math_module, var_name2, pxs_newhost(object));
-        free_raw_string!(var_name2);
+        // println!("Before adding new variable");
+        // // Set variable
+        // let var_name2 = create_raw_string!("todo");
+        // let host_object = pxs_newhost(object);
+        // if host_object.is_null() {
+        //     println!("Host is null");
+        // } else {
+        //     println!("Host is not null my man");
+        // }
+        // pxs_addvar(math_module, var_name2, host_object);
+        // free_raw_string!(var_name2);
 
-        println!("After addiing");
+        // println!("After addiing");
         // Add a sub function
         let sub_name = create_raw_string!("sub");
         pxs_addfunc(math_module, sub_name, sub_wrapper, ptr::null_mut());
@@ -440,7 +397,7 @@ mod tests {
         pxs_set_filereader(file_loader);
         pxs_set_dirreader(dir_reader);
 
-        let runtime = pxs_Runtime::pxs_Lua;
+        let runtime = pxs_Runtime::pxs_Python;
         let mut lines = vec![];
         loop {
             let mut input = String::new(); // Create an empty, mutable String
@@ -453,17 +410,12 @@ mod tests {
             } else if input.contains("run") {
                 let full_lines = lines.join("\n");
                 let err = match runtime {
-                    pxs_Runtime::pxs_Lua => {
-                        LuaScripting::execute(&full_lines, "<test_repl>")
-                    }
-                    pxs_Runtime::pxs_Python => {
-                        PythonScripting::execute(&full_lines, "<test_repl>")
-                    }
+                    pxs_Runtime::pxs_Lua => LuaScripting::execute(&full_lines, "<test_repl>"),
+                    pxs_Runtime::pxs_Python => PythonScripting::execute(&full_lines, "<test_repl>"),
                     pxs_Runtime::pxs_JavaScript => todo!(),
                     pxs_Runtime::pxs_Easyjs => todo!(),
                     pxs_Runtime::pxs_RustPython => todo!(),
-                    _ => todo!()
-                    // pxs_Runtime::LuaJit => todo!(),
+                    _ => todo!(), // pxs_Runtime::LuaJit => todo!(),
                 };
 
                 if !err.is_empty() {

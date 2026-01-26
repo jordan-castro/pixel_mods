@@ -27,8 +27,7 @@
 
 ## Objects
 <!-- - Use a Vector for lookup. -->
-- Optomize Object creation. Potentially doing at `add` rather than callbacks.
-- For Object.calls take in a VarList instead of argc and argv?
+- Allow to set a variable in a module to a Object. Not working currently for some reason.
 
 ## Vars
 - Add exceptions
