@@ -77,7 +77,14 @@ if target:
     path_to_build = f"target/{rtarget}/release/build"
     path_to_release = f"target/{rtarget}/release"
 
-Path(SOURCE).mkdir(exist_ok=True)
+# Create source
+source = Path(SOURCE)
+# If exists, clear it
+if source.exists() and source.is_dir():
+    shutil.rmtree(source)
+source.mkdir(exist_ok=True)
+
+# Collect the pixelscript lib
 collect_libs(path_to_release, rule="/*")
 
 build_dir = Path(path_to_build)
