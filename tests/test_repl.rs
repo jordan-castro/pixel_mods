@@ -396,15 +396,14 @@ mod tests {
                 let err = match runtime {
                     pxs_Runtime::pxs_Lua => LuaScripting::execute(&full_lines, "<test_repl>"),
                     pxs_Runtime::pxs_Python => PythonScripting::execute(&full_lines, "<test_repl>"),
-                    pxs_Runtime::pxs_JavaScript => todo!(),
-                    pxs_Runtime::pxs_Easyjs => todo!(),
-                    pxs_Runtime::pxs_RustPython => todo!(),
                     _ => todo!(), // pxs_Runtime::LuaJit => todo!(),
                 };
 
                 if !err.is_empty() {
                     println!("Repl error is: {err}");
                 }
+
+                lines.clear();
             } else {
                 lines.push(input.clone());
             }
