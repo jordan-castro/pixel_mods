@@ -42,11 +42,15 @@
 
 ## Lua
 - Fix leaks
+- Add Object.get
+- Add Object.set
 
 ## Python (rustpython)
 - Eventually look back at this
 
 ## Python (PocketPy)
+- Add Object.get
+- Add Object.set
 
 ## JS
 - add_variable

@@ -31,10 +31,6 @@ struct State {
     engine: Lua,
     /// Cached Tables
     tables: RefCell<HashMap<String, LuaTable>>,
-    /// Boxed Tables
-    boxed_tables: RefCell<Vec<Box<*mut LuaTable>>>,
-    /// Boxed Functions
-    boxed_functions: RefCell<Vec<Box<*mut LuaFunction>>>
 }
 
 /// Initialize Lua state per thread.
@@ -42,8 +38,6 @@ fn init_state() -> State {
     State {
         engine: Lua::new(),
         tables: RefCell::new(HashMap::new()),
-        boxed_tables: RefCell::new(Vec::new()),
-        boxed_functions: RefCell::new(Vec::new()),
     }
 }
 
@@ -151,19 +145,10 @@ impl PixelScript for LuaScripting {
         // Kill lua
         let state = get_lua_state();
 
-        // First drop the boxed stuff
-        for item in state.boxed_functions.borrow().iter() {
-            let _ = unsafe { Box::from_raw(**item) };
-        }
-        for item in state.boxed_tables.borrow().iter() {
-            let _ = unsafe { Box::from_raw(**item) };
-        }
-
         // Ok clear the cached tables
         state.tables.borrow_mut().clear();
 
         // Ok now cler the GC.
-        state.engine.gc_collect().unwrap();
         state.engine.gc_collect().unwrap();
     }
 
@@ -173,7 +158,16 @@ impl PixelScript for LuaScripting {
 
     fn stop_thread() {
         // Run the stop logic.
-        Self::stop();
+    }
+    
+    fn clear_state(call_gc: bool) {
+        let state = get_lua_state();
+
+        state.tables.borrow_mut();
+
+        if call_gc {
+            state.engine.gc_collect().unwrap();
+        }
     }
 }
 

@@ -44,6 +44,7 @@ macro_rules! write_new_methods {
                 Self {
                     tag: $vt,
                     value: pxs_VarValue { $vn: val },
+                    deleter: None
                 }
             }
         )*
@@ -145,7 +146,7 @@ impl pxs_VarList {
 
     /// Get a Var from the list. Supports negative based indexes.
     pub fn get_item(&self, index: i32) -> Option<&pxs_Var> {
-        // Get correct negative index.
+        // Get correct negative index. 
         let r_index = {
             if index < 0 {
                 (self.vars.len() as i32) + index
@@ -205,6 +206,8 @@ pub union pxs_VarValue {
     pub function_val: *mut c_void,
 }
 
+type DeleterFn = Box<dyn Fn(*mut c_void) + Send + Sync>;
+
 /// A PixelScript Var(iable).
 ///
 /// This is the universal truth between all languages PixelScript supports.
@@ -238,6 +241,9 @@ pub struct pxs_Var {
     pub tag: pxs_VarType,
     /// A value as a union.
     pub value: pxs_VarValue,
+
+    /// Optional delete method. This is used for Pointers in Objects, and Functions.
+    pub deleter: Option<DeleterFn>,
 }
 
 // Rust specific functions
@@ -285,6 +291,7 @@ impl pxs_Var {
             value: pxs_VarValue {
                 string_val: cstr.into_raw(),
             },
+            deleter: None
         }
     }
 
@@ -297,6 +304,7 @@ impl pxs_Var {
             value: pxs_VarValue {
                 null_val: ptr::null(),
             },
+            deleter: None
         }
     }
 
@@ -307,14 +315,16 @@ impl pxs_Var {
             value: pxs_VarValue {
                 host_object_val: ptr,
             },
+            deleter: None
         }
     }
 
     /// Create a new Object var.
-    pub fn new_object(ptr: *mut c_void) -> Self {
+    pub fn new_object(ptr: *mut c_void, deleter: Option<DeleterFn>) -> Self {
         pxs_Var {
             tag: pxs_VarType::pxs_Object,
             value: pxs_VarValue { object_val: ptr },
+            deleter: deleter
         }
     }
 
@@ -325,6 +335,7 @@ impl pxs_Var {
             value: pxs_VarValue {
                 list_val: pxs_VarList::new().into_raw(),
             },
+            deleter: None
         }
     }
 
@@ -336,15 +347,17 @@ impl pxs_Var {
             tag: pxs_VarType::pxs_List,
             value: pxs_VarValue {
                 list_val: list.into_raw()
-            }
+            },
+            deleter: None
         }
     }
 
     /// Create a new Function var.
-    pub fn new_function(ptr: *mut c_void) -> Self {
+    pub fn new_function(ptr: *mut c_void, deleter: Option<DeleterFn>) -> Self {
         pxs_Var {
             tag: pxs_VarType::pxs_Function,
             value: pxs_VarValue { function_val: ptr },
+            deleter: deleter
         }
     }
 
@@ -471,6 +484,14 @@ impl Drop for pxs_Var {
                 // This will automatically drop
                 pxs_VarList::from_raw(self.value.list_val)
             };
+        } else if self.tag == pxs_VarType::pxs_Object {
+            if let Some(deleter) = &self.deleter {
+                deleter(unsafe { self.value.object_val });
+            }
+        } else if self.tag == pxs_VarType::pxs_Function {
+            if let Some(deleter) = &self.deleter {
+                deleter(unsafe { self.value.function_val });
+            }
         }
     }
 }
@@ -492,6 +513,7 @@ impl Clone for pxs_Var {
                         value: pxs_VarValue {
                             string_val: new_string,
                         },
+                        deleter: None
                     }
                 }
                 pxs_VarType::pxs_Bool => pxs_Var::new_bool(self.value.bool_val),
@@ -502,6 +524,7 @@ impl Clone for pxs_Var {
                     value: pxs_VarValue {
                         object_val: self.value.object_val,
                     },
+                    deleter: None
                 },
                 pxs_VarType::pxs_HostObject => pxs_Var::new_host_object(self.value.host_object_val),
                 pxs_VarType::pxs_List => {
@@ -520,9 +543,18 @@ impl Clone for pxs_Var {
                         value: pxs_VarValue {
                             list_val: list.into_raw(),
                         },
+                        deleter: None
                     }
                 }
-                pxs_VarType::pxs_Function => pxs_Var::new_function(self.value.function_val),
+                pxs_VarType::pxs_Function => {
+                    pxs_Var {
+                        tag: pxs_VarType::pxs_Function,
+                        value: pxs_VarValue {
+                            function_val: self.value.function_val
+                        },
+                        deleter: None
+                    }
+                },
             }
         }
     }

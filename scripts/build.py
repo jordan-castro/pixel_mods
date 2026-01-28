@@ -60,7 +60,6 @@ for arg in argv:
         features_ = ",".join(arg.split("=")[-1])
         features += ["--features", f'"{features_}"']
 
-
 # Build in release mode
 cmd = ["cargo", "build", "--release"]
 # Grab target and features if passed

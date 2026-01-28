@@ -20,6 +20,16 @@ use crate::{
     },
 };
 
+/// Lua Function for freeing memory
+fn free_lua_mem(ptr: *mut c_void) {
+    if ptr.is_null() {
+        return;
+    }
+    unsafe {
+        let _ = Box::from_raw(ptr);
+    }
+}
+
 /// Convert a Lua value to a Var.
 pub(super) fn from_lua(value: LuaValue) -> Result<pxs_Var, anyhow::Error> {
     match value {
@@ -30,7 +40,10 @@ pub(super) fn from_lua(value: LuaValue) -> Result<pxs_Var, anyhow::Error> {
         LuaValue::Function(f) => {
             // Get as pointer
             let func = Box::into_raw(Box::new(f));
-            Ok(pxs_Var::new_function(func as *mut c_void))
+            Ok(pxs_Var::new_function(
+                func as *mut c_void,
+                Some(Box::new(free_lua_mem)),
+            ))
         }
         LuaValue::Table(t) => {
             // Check if table is actually a list.
@@ -39,7 +52,7 @@ pub(super) fn from_lua(value: LuaValue) -> Result<pxs_Var, anyhow::Error> {
             if t_length == 0 {
                 // Regular table
                 let obj = Box::into_raw(Box::new(t));
-                Ok(pxs_Var::new_object(obj as *mut c_void))
+                Ok(pxs_Var::new_object(obj as *mut c_void, Some(Box::new(free_lua_mem))))
             } else {
                 // It's a list.
                 let mut values = vec![];
@@ -123,13 +136,15 @@ pub(super) fn into_lua(lua: &Lua, var: &pxs_Var) -> LuaResult<LuaValue> {
             }
 
             Ok(mlua::Value::Table(table))
-        },
+        }
         pxs_VarType::pxs_Function => {
             unsafe {
                 // This has got to be a function
                 let func_ptr = var.value.function_val as *const LuaFunction;
                 if func_ptr.is_null() {
-                    return Err(mlua::Error::RuntimeError("Null pointer in Function".to_string()));
+                    return Err(mlua::Error::RuntimeError(
+                        "Null pointer in Function".to_string(),
+                    ));
                 }
 
                 // Clone the function
@@ -138,6 +153,6 @@ pub(super) fn into_lua(lua: &Lua, var: &pxs_Var) -> LuaResult<LuaValue> {
                 // Shouldn't I just return the value? Not sure...
                 Ok(mlua::Value::Function(lua_function))
             }
-        },
+        }
     }
 }

@@ -64,9 +64,9 @@ pub(super) fn pocketpyref_to_var(pref: pocketpy::py_Ref) -> pxs_Var {
         pxs_Var::new_list_with(vars)
     } else if tp == pocketpy::py_PredefinedType::tp_function as i32 {
         // Just like object, save the raw pointer
-        pxs_Var::new_function(pref as *mut c_void)
-    }else {
-        pxs_Var::new_object(pref as *mut c_void)
+        pxs_Var::new_function(pref as *mut c_void, None)
+    } else {
+        pxs_Var::new_object(pref as *mut c_void, None)
     }
 }
 

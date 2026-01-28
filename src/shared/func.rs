@@ -125,6 +125,7 @@ pub unsafe fn call_function(fn_idx: i32, args: Vec<pxs_Var>) -> pxs_Var {
         value: pxs_VarValue {
             list_val: pxs_VarList { vars: args }.into_raw(),
         },
+        deleter: None
     };
     let args_ptr = args.into_raw();
 

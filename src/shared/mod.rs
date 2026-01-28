@@ -205,6 +205,8 @@ pub trait PixelScript {
     fn start_thread();
     /// Tells the language that we just finished the most recent started thread.
     fn stop_thread();
+    /// Clear the current threads state. Optionally calls garbage collector.
+    fn clear_state(call_gc: bool); 
 }
 
 /// Public enum for supported runtimes.

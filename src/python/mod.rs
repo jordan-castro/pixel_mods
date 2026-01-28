@@ -287,6 +287,9 @@ impl PixelScript for PythonScripting {
 
     fn stop_thread() {
         unsafe {
+            // clear current
+            Self::clear_state(false);
+
             let idx = pocketpy::py_currentvm() - 1;
             pocketpy::py_resetvm();
             pocketpy::py_switchvm(idx);
@@ -294,6 +297,21 @@ impl PixelScript for PythonScripting {
             *(state.thread_idx.borrow_mut()) = idx;
         }
     }
+    
+    fn clear_state(call_gc: bool) {
+        // Drop defined objects
+        let state = get_py_state();
+        state.defined_objects.borrow_mut().clear();
+
+        if call_gc {
+            // Invoke GC
+            unsafe {
+                pocketpy::py_gc_collect();
+            }
+        }
+    }
+
+    
 }
 
 /// Add pxs vars to the stack
